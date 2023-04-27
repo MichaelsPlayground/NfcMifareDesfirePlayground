@@ -866,6 +866,8 @@ public class DESFireEV1 {
 
 		preprocess(apdu, DesfireFileCommunicationSettings.PLAIN);
 		byte[] responseAPDU = transmit(apdu);
+		System.out.println("## getFileSettingsImpl send APDU: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(apdu));
+		System.out.println("## getFileSettingsImpl resp APDU: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(responseAPDU));
 		code = getSW2(responseAPDU);
 
 		feedback(apdu, responseAPDU);
@@ -1787,7 +1789,17 @@ public class DESFireEV1 {
 	 */
 	private DesfireFileCommunicationSettings getFileCommSett(byte fileNo, boolean rw, boolean car, boolean r, boolean w) throws Exception {
 		
-		DesfireFile fileSett = updateFileSett(fileNo, false);
+		//DesfireFile fileSett = updateFileSett(fileNo, false);
+		DesfireFile fileSett = updateFileSett(fileNo, true);
+		// todo remove
+		System.out.println("### getFileCommSett fileSett: " + fileSett.toString());
+		System.out.println("### valid for fileNumber: " + fileNo);
+		System.out.println("### getCommunicationSettings: " + fileSett.getCommunicationSettings().toString());
+		System.out.println("### fileSett.isReadWriteAccess(fileNo): " + fileSett.isReadWriteAccess(fileNo));
+		System.out.println("### fileSett.isRead     Access(fileNo): " + fileSett.isReadAccess(fileNo));
+		System.out.println("### fileSett.isWrite    Access(fileNo): " + fileSett.isWriteAccess(fileNo));
+		System.out.println("### fileSett.isCAR      Access(fileNo): " + fileSett.isChangeAccess(fileNo));
+		System.out.println("### fileSett.isFreeRead Access(fileNo): " + fileSett.isFreeReadAccess());
 
 		if (rw) {
 			if(fileSett.isReadWriteAccess(fileNo)) {
@@ -1821,7 +1833,8 @@ public class DESFireEV1 {
 			}
 		}
 
-		return null;
+		//return null;
+		return DesfireFileCommunicationSettings.PLAIN; // new, just in case nothing matches
 	}
 
 	/* Support method for getFileCommSett(rw, car, r, w). */
@@ -1868,12 +1881,13 @@ public class DESFireEV1 {
 		if (cmd == Command.READ_RECORDS.getCode()) {
 			settings = updateFileSett(fileNumber, true);
 		} else {
-			settings = updateFileSett(fileNumber, false);
+			//settings = updateFileSett(fileNumber, false);
+			settings = updateFileSett(fileNumber, true); // todo is this ok to have an updated value
 		}
 		
 		DesfireFileCommunicationSettings cs = getFileCommSett(fileNumber, true, false, true, false);
 
-		cs = DesfireFileCommunicationSettings.PLAIN; // todo check on this
+		//cs = DesfireFileCommunicationSettings.PLAIN; // todo check on this
 
 		if (cs == null) return null;
 		
@@ -1945,10 +1959,17 @@ public class DESFireEV1 {
 	/* Support method for writeData/writeRecord. */
 	private boolean write(byte[] payload, byte cmd) throws Exception {
 		System.out.println("### write payload length: " + payload.length + " data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(payload));
-		DesfireFileCommunicationSettings cs = getFileCommSett(payload[0], true, false, false, true);
 
+		DesfireFile settings = updateFileSett(payload[0], true); // todo new
+		System.out.println("### settings: " + settings.toString());
+		DesfireFileCommunicationSettings cs = getFileCommSett(payload[0], true, false, false, true);
+		if (cs == null) {
+			System.out.println("### cs is NULL");
+		} else {
+			System.out.println("### cs: " + cs.toString());
+		}
 		// rough overwrite
-		cs = DesfireFileCommunicationSettings.PLAIN;
+		//cs = DesfireFileCommunicationSettings.PLAIN;
 
 		if (cs == null) return false;
 
@@ -1957,7 +1978,8 @@ public class DESFireEV1 {
 		fullApdu[0] = (byte) 0x90;
 		fullApdu[1] = cmd;
 		//fullApdu[4] = -1;
-		fullApdu[4] = -1;
+		// todo changed
+		fullApdu[4] = (byte) (payload.length & 0xFF); // length byte
 		System.arraycopy(payload, 0, fullApdu, 5, payload.length);
 		System.out.println("### write fullAPDU 1 length: " + fullApdu.length + " data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(fullApdu));
 		fullApdu = preprocess(fullApdu, 7, cs);  // 7 = 1+3+3 (keyNo+off+len)

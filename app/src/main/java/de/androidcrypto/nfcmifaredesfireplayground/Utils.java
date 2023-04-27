@@ -103,7 +103,7 @@ public class Utils {
 
 
     // converts an int to a 3 byte long array
-    public byte[] intTo3ByteArray(int value) {
+    public static byte[] intTo3ByteArray(int value) {
         return new byte[] {
                 (byte)(value >> 16),
                 (byte)(value >> 8),
@@ -111,7 +111,7 @@ public class Utils {
     }
 
     // converts an int to a 3 byte long array inversed
-    public byte[] intTo3ByteArrayInversed(int value) {
+    public static byte[] intTo3ByteArrayInversed(int value) {
         return new byte[] {
                 (byte)value,
                 (byte)(value >> 8),

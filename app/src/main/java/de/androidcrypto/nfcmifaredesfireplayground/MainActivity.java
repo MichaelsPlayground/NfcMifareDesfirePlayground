@@ -2197,6 +2197,7 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                     byte[] desKey = new byte[8];
                     byte desKeyNumberRW = (byte) 0;
                     byte desFileNumberStandard = (byte) 0x01;
+                    byte desFileNumberCyclic = (byte) 0x02;
                     byte applicationMasterKeySettings = (byte) 0x0f; // amks
                     boolean dfCreateStandard = desfire.createApplication(desAidStandard, applicationMasterKeySettings, KeyType.DES, (byte) 3);
                     writeToUiAppend(readResult, "dfCreateStandardResult: " + dfCreateStandard);
@@ -2207,7 +2208,7 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                     boolean dfAuthStandard = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
                     writeToUiAppend(readResult, "dfAuthReadStandardResult: " + dfAuthStandard);
 
-                    byte communicationSettings = (byte) 0x0; // plain
+                    byte communicationSettings = (byte) 0x00; // plain
                     byte accessRightsRwCar = (byte) 0x00; // Read&Write Access & ChangeAccessRights
                     byte accessRightsRW = (byte) 0x00; // Read Access & Write Access // read with key 0, write with key 0
                     byte[] fileSize = new byte[]{(byte) 0x20, (byte) 0xf00, (byte) 0x00}; // 32 bytes
@@ -2224,9 +2225,9 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                     // auth
                     boolean dfAuth1 = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
                     writeToUiAppend(readResult, "dfAuthReadResult: " + dfAuth1);
-/*
+
                     // byte[] payloadWriteData;
-                    byte[] dataByte = "hello".getBytes(StandardCharsets.UTF_8); // 5 bytes long
+                    byte[] dataByte = "22222222".getBytes(StandardCharsets.UTF_8); // 5 bytes long
                     byte[] offset = new byte[]{(byte) 0x00, (byte) 0xf00, (byte) 0x00}; // write at the beginning
                     byte lengthOfData = (byte) (dataByte.length & 0xFF);
                     byte[] payloadWriteData = new byte[7 + dataByte.length]; // 7 + length of data
@@ -2239,7 +2240,7 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                     writeToUiAppend(readResult, printData("payloadWriteData", payloadWriteData));
                     boolean dfWriteStandard = desfire.writeData(payloadWriteData);
                     writeToUiAppend(readResult, "dfWriteStandardResult: " + dfWriteStandard);
-*/
+
                     /*
                     // is my own write method
                     responseData = new byte[2];
@@ -2283,7 +2284,7 @@ writeStandardFileResponse length: 2 data: 9100
 /*
 read in Desfire line 1860 private byte[] read(byte fileNumber, int offset, int length, int cmd) throws Exception {
 
-                           90bd 000007 01 000000 000020 00
+
 working own:
 send APDU length: 13 data: 90bd 000007 01 000000 200000 00
 
@@ -2323,6 +2324,44 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                     boolean dfWrite = desfire.writeRecord(writeFileParameters);
                     writeToUiAppend(readResult, "dfWrite: " + dfWrite);
                     */
+
+                    // to create a Cyclic file we auth first
+                    boolean dfAuthCyclic1 = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthCyclic1Result: " + dfAuthCyclic1);
+
+                    byte[] payloadCyclicFile = new byte[10]; // just to show the length
+                    int cyclicFileRecordSize = 32; // 32 bytes
+                    int cyclicFileMaxNumberOfRecords = 6; // 5 + 1 spare for writing
+                    payloadCyclicFile[0] = desFileNumberCyclic; // fileNumber
+                    payloadCyclicFile[1] = communicationSettings;
+                    payloadCyclicFile[2] = accessRightsRwCar;
+                    payloadCyclicFile[3] = accessRightsRW;
+                    System.arraycopy(Utils.intTo3ByteArrayInversed(cyclicFileRecordSize), 0, payloadCyclicFile, 4, 3);
+                    System.arraycopy(Utils.intTo3ByteArrayInversed(cyclicFileMaxNumberOfRecords), 0, payloadCyclicFile, 7, 3);
+                    writeToUiAppend(readResult, printData("payloadCyclicFile", payloadCyclicFile));
+                    boolean dfCreateCyclicFile1 = desfire.createCyclicRecordFile(payloadCyclicFile);
+                    writeToUiAppend(readResult, "dfCreateCyclicFile1 Result: " + dfCreateCyclicFile1);
+
+                    // write data to the file
+                    byte[] offsetZero = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // write to the beginning
+                    String contentString = "Entry from " + Utils.getTimestamp(); // timestamp is 19 characters long
+                    int contentLengthInt = contentString.length();
+                    // todo be more universal with this. The created record size is 32 so this data is fitting into one record
+                    byte[] contentLength = new byte[]{(byte) (contentLengthInt & 0xFF), (byte) 0x00, (byte) 0x00};
+                    byte[] content = contentString.getBytes(StandardCharsets.UTF_8);
+                    byte[] payloadWriteCyclicFile = new byte[(contentLengthInt + 7)];
+                    payloadWriteCyclicFile[0] = desFileNumberCyclic;
+                    System.arraycopy(offsetZero, 0, payloadWriteCyclicFile, 1, 3);
+                    System.arraycopy(contentLength, 0, payloadWriteCyclicFile, 4, 3);
+                    System.arraycopy(content, 0, payloadWriteCyclicFile, 7, contentLengthInt);
+                    writeToUiAppend(readResult, printData("payloadWriteCyclicFile", payloadWriteCyclicFile));
+                    boolean dfWriteToCyclicFile1 = desfire.writeRecord(payloadWriteCyclicFile);
+                    writeToUiAppend(readResult, "dfWriteToCyclicFile1 Result: " + dfWriteToCyclicFile1);
+
+                    // don't forget to commit each writing to a record file
+
+                    boolean dfCommitCyclicFile1 = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommitCyclicFile1 Result: " + dfCommitCyclicFile1);
 
 
                 } catch (IOException e) {
