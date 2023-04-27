@@ -32,6 +32,7 @@ import com.github.skjolber.desfire.ev1.model.command.IsoDepAdapter;
 import com.github.skjolber.desfire.ev1.model.command.IsoDepWrapper;
 import com.github.skjolber.desfire.ev1.model.file.DesfireFile;
 import com.github.skjolber.desfire.ev1.model.file.DesfireFileCommunicationSettings;
+import com.github.skjolber.desfire.ev1.model.file.RecordDesfireFile;
 import com.github.skjolber.desfire.libfreefare.MifareTag;
 
 import java.io.ByteArrayOutputStream;
@@ -2298,8 +2299,9 @@ readStandardFileResponse: 88887777??????????????????????????????????????????????
                     // get the maximal length from getFileSettings
                     byte[] readStandard = desfire.readData(desFileNumberStandard, (byte) 0x00, (byte) 0x20);
                     writeToUiAppend(readResult, printData("readStandard", readStandard));
-
-
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    }
 
 /*
 fs: RecordDesfireFile [recordSize=32, maxRecords=6, currentRecords=0, records=null, fileType=CYCLIC_RECORD_FILE,
@@ -2365,12 +2367,54 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                     boolean dfCommitCyclicFile1 = desfire.commitTransaction();
                     writeToUiAppend(readResult, "dfCommitCyclicFile1 Result: " + dfCommitCyclicFile1);
 
+
+                    // do the auth for reading
+                    boolean dfAuthCyclic2 = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthCyclic2 Result: " + dfAuthCyclic2);
+
+                    // get the file settings for the new file
+                    responseData = new byte[2];
+                    byte[] fileSettingsRecord = getFileSettingsRecord(readResult, desFileNumberCyclic, responseData);
+                    writeToUiAppend(readResult, printData("fileSettingsRecord", fileSettingsRecord) + " with response: " + Utils.bytesToHex(responseData));
+                    if (!checkResponse(fileSettingsRecord)) {
+                        writeToUiAppend(readResult, "the fileSettingsRecord was not successful, aborted");
+                        return;
+                    }
+                    byte[] fileSettingsData = Arrays.copyOf(fileSettingsRecord, fileSettingsRecord.length - 2);
+                    int recordsInCyclicFile = 0;
+                    if (fileSettingsData.length == 13) {
+                        FileSettingRecordModel fsrm = new FileSettingRecordModel(desFileNumberCyclic, fileSettingsData);
+                        writeToUiAppend(readResult, fsrm.dumpFileSizes());
+                        recordsInCyclicFile = fsrm.getRecordsExisting();
+                    }
+
+                    writeToUiAppend(readResult, "reading number of records: " + recordsInCyclicFile);
+
+/*
+                    // get the credentials from file
+                    DesfireFile dff = desfire.getFileSettings(desFileNumberCyclic);
+                    writeToUiAppend(readResult, "getFileSetting: " + dff.toString());
+*/
+
+                    for (int i = 0; i < recordsInCyclicFile; i++) {
+                        writeToUiAppend(readResult, "cyclic file record number: " + i);
+                        byte[] readCyclicFile = desfire.readRecords(desFileNumberCyclic, i, 1); // means from record 0 to 4, reading 1 record per read
+                        writeToUiAppend(readResult, printData("readCyclicFile", readCyclicFile));
+                        if (readStandard != null) {
+                            writeToUiAppend(readResult, new String(readCyclicFile, StandardCharsets.UTF_8));
+                        }
+                    }
+
+
+
+
+                    /*
                     WriteCyclicFileBuilderBuilder writeCyclicFileBuilderBuilder = new WriteCyclicFileBuilderBuilder();
                     writeCyclicFileBuilderBuilder
                             .setFileNumber(1)
                             .setContent("abc");
                     writeToUiAppend(readResult, writeCyclicFileBuilderBuilder.createWriteCyclicFileBuilder().toString());
-
+*/
 
                 } catch (IOException e) {
                     writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
