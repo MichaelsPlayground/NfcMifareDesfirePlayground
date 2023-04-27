@@ -46,6 +46,8 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import de.androidcrypto.WriteCyclicFileBuilder;
+import de.androidcrypto.WriteCyclicFileBuilderBuilder;
 import nfcjlib.core.DESFireAdapter;
 import nfcjlib.core.DESFireEV1;
 import nfcjlib.core.KeyType;
@@ -2362,6 +2364,12 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
 
                     boolean dfCommitCyclicFile1 = desfire.commitTransaction();
                     writeToUiAppend(readResult, "dfCommitCyclicFile1 Result: " + dfCommitCyclicFile1);
+
+                    WriteCyclicFileBuilderBuilder writeCyclicFileBuilderBuilder = new WriteCyclicFileBuilderBuilder();
+                    writeCyclicFileBuilderBuilder
+                            .setFileNumber(1)
+                            .setContent("abc");
+                    writeToUiAppend(readResult, writeCyclicFileBuilderBuilder.createWriteCyclicFileBuilder().toString());
 
 
                 } catch (IOException e) {
