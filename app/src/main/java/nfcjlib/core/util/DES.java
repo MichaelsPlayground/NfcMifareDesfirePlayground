@@ -34,6 +34,8 @@ public class DES {
 			cipher.init(Cipher.ENCRYPT_MODE, key, iv);
 			cipherText = cipher.doFinal(myMsg);
 		} catch (Exception e) {
+			//TODO: multicatch only Java 1.7+
+			e.printStackTrace();
 			return null;
 		}
 

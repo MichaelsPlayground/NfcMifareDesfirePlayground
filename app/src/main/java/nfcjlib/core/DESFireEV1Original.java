@@ -10,15 +10,6 @@
  */
 package nfcjlib.core;
 
-import static com.github.skjolber.desfire.libfreefare.C.BUFFER_APPEND;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import android.util.Log;
 
 import com.github.skjolber.desfire.ev1.model.DesfireApplicationId;
@@ -32,6 +23,13 @@ import com.github.skjolber.desfire.ev1.model.file.StandardDesfireFile;
 import com.github.skjolber.desfire.ev1.model.file.ValueDesfireFile;
 import com.github.skjolber.desfire.ev1.model.random.DefaultRandomSource;
 import com.github.skjolber.desfire.ev1.model.random.RandomSource;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import nfcjlib.core.util.AES;
 import nfcjlib.core.util.BitOp;
@@ -50,15 +48,15 @@ import nfcjlib.core.util.TripleDES;
  * @author	Daniel Andrade
  * @version	9.9.2013, 0.4
  */
-public class DESFireEV1 {
-	
+public class DESFireEV1Original {
+
 	public static final byte APPLICATION_CRYPTO_DES = 0x00;
 	public static final byte APPLICATION_CRYPTO_3K3DES = 0x40;
 	public static final byte APPLICATION_CRYPTO_AES = (byte) 0x80;
 
 	public static final int MAX_FILE_COUNT = 32;
-	
-	private static final String TAG = DESFireEV1.class.getName();
+
+	private static final String TAG = DESFireEV1Original.class.getName();
 
 	/** A file/key number that does not exist. */
 	private final static byte FAKE_NO = -1;
@@ -74,11 +72,11 @@ public class DESFireEV1 {
 	private DESFireAdapter adapter;
 	private RandomSource randomSource = new DefaultRandomSource();
 	private boolean print;
-	
+
 	// cached file settings
 	private DesfireFile[] fileSettings = new DesfireFile[MAX_FILE_COUNT];
-	
-	public DESFireEV1() {
+
+	public DESFireEV1Original() {
 		reset();
 		aid = new byte[3];
 	}
@@ -1131,7 +1129,7 @@ public class DESFireEV1 {
 	 * @throws Exception
 	 */
 	public byte[] readData(byte fileNumber, int offset, int length) throws Exception {
-		return read(fileNumber, offset, length, Command.READ_DATA.getCode()); // READ_DATA =(0xBD),
+		return read(fileNumber, offset, length, Command.READ_DATA.getCode());
 	}
 
 	/**
@@ -1859,8 +1857,7 @@ public class DESFireEV1 {
 	/* Support method for readData/readRecords. */
 	private byte[] read(byte fileNumber, int offset, int length, int cmd) throws Exception {
 
-		//byte[] payload = new CommandBuilder(7).bytes1(fileNumber).bytes3(offset).bytes3(length).bytes();
-		byte[] payload = new CommandBuilder(7).bytes1(fileNumber).bytes3Lsb(offset).bytes3Lsb(length).bytes();
+		byte[] payload = new CommandBuilder(7).bytes1(fileNumber).bytes3(offset).bytes3(length).bytes();
 		
 		// record files: file settings could be cached,
 		// returning an erroneous number of current records
@@ -1872,12 +1869,10 @@ public class DESFireEV1 {
 		}
 		
 		DesfireFileCommunicationSettings cs = getFileCommSett(fileNumber, true, false, true, false);
-
-		cs = DesfireFileCommunicationSettings.PLAIN; // todo check on this
-
-		if (cs == null) return null;
+		if (cs == null)
+			return null;
 		
-		//ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		int responseLength = findResponseLength(settings, offset, length, cmd);
 
 		byte[] apdu = new byte[13];
@@ -1888,14 +1883,13 @@ public class DESFireEV1 {
 		apdu[4] = 0x07;
 		System.arraycopy(payload, 0, apdu, 5, 7);
 		apdu[12] = 0x00;
-		System.out.println("### Desfire read send apdu length: " + apdu.length +" data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(apdu));
+
 		preprocess(apdu, DesfireFileCommunicationSettings.PLAIN);
 		
 		byte[] responseAPDU = adapter.transmitChain(apdu);
 		feedback(apdu, responseAPDU);
-		System.out.println("### Desfire read resp apdu length: " + responseAPDU.length +" data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(responseAPDU));
-		return postprocess(responseAPDU, responseLength, cs); // this seems to be better
-		//return postprocess(baos.toByteArray(), responseLength, cs); // baos... is empty
+
+		return postprocess(baos.toByteArray(), responseLength, cs);
 	}
 
 	/* Support method for read(). Find length of just the data. Retrieved
@@ -1944,27 +1938,21 @@ public class DESFireEV1 {
 
 	/* Support method for writeData/writeRecord. */
 	private boolean write(byte[] payload, byte cmd) throws Exception {
-		System.out.println("### write payload length: " + payload.length + " data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(payload));
 		DesfireFileCommunicationSettings cs = getFileCommSett(payload[0], true, false, false, true);
-
-		// rough overwrite
-		cs = DesfireFileCommunicationSettings.PLAIN;
-
-		if (cs == null) return false;
+		if (cs == null)
+			return false;
 
 		byte[] apdu;
 		byte[] fullApdu = new byte[6 + payload.length];
 		fullApdu[0] = (byte) 0x90;
 		fullApdu[1] = cmd;
-		//fullApdu[4] = -1;
 		fullApdu[4] = -1;
 		System.arraycopy(payload, 0, fullApdu, 5, payload.length);
-		System.out.println("### write fullAPDU 1 length: " + fullApdu.length + " data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(fullApdu));
+
 		fullApdu = preprocess(fullApdu, 7, cs);  // 7 = 1+3+3 (keyNo+off+len)
-		System.out.println("### write fullAPDU 2 length: " + fullApdu.length + " data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(fullApdu));
 		
 		byte[] responseAPDU = adapter.transmitChain(fullApdu);
-		System.out.println("### write responseAPDU length: " + responseAPDU.length + " data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(responseAPDU));
+		
 		return postprocess(responseAPDU, DesfireFileCommunicationSettings.PLAIN) != null;
 	}
 
@@ -2329,7 +2317,7 @@ public class DESFireEV1 {
 		 * @return			the session key on success, or {@code null} on error
 		 * @throws IOException 
 		 */
-		public static byte[] runAll(DESFireEV1 desfire, byte[] key, byte keyNo, KeyType type) throws IOException {
+		public static byte[] runAll(DESFireEV1Original desfire, byte[] key, byte keyNo, KeyType type) throws IOException {
 			byte[] randBe = start(desfire, keyNo, type);
 			if (randBe == null)
 				return null;
@@ -2373,7 +2361,7 @@ public class DESFireEV1 {
 		 * @return			the enciphered random number B, or {@code null} on error
 		 * @throws IOException 
 		 */
-		public static byte[] start(DESFireEV1 desfire, byte keyNo, KeyType type) throws IOException {
+		public static byte[] start(DESFireEV1Original desfire, byte keyNo, KeyType type) throws IOException {
 			byte[] apdu = new byte[7];
 			apdu[0] = (byte) 0x90;
 			switch (type) {
@@ -2477,7 +2465,7 @@ public class DESFireEV1 {
 		 * @return			the enciphered rotated random number A, or {@code null} otherwise 
 		 * @throws IOException 
 		 */
-		public static byte[] exchangeSecondMsg(DESFireEV1 desfire, byte[] randABre) throws IOException {
+		public static byte[] exchangeSecondMsg(DESFireEV1Original desfire, byte[] randABre) throws IOException {
 			byte[] apdu = new byte[5 + randABre.length + 1];
 			apdu[0] = (byte) 0x90;
 			apdu[1] = (byte) 0xAF;

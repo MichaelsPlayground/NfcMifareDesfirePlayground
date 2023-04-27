@@ -34,8 +34,6 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import nfcjlib.core.DESFireEV1;
-
 
 public class MainActivityPartsEncryptedFail extends AppCompatActivity implements NfcAdapter.ReaderCallback {
 

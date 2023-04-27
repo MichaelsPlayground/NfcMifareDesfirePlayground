@@ -101,6 +101,24 @@ public class Utils {
         }
     }
 
+
+    // converts an int to a 3 byte long array
+    public byte[] intTo3ByteArray(int value) {
+        return new byte[] {
+                (byte)(value >> 16),
+                (byte)(value >> 8),
+                (byte)value};
+    }
+
+    // converts an int to a 3 byte long array inversed
+    public byte[] intTo3ByteArrayInversed(int value) {
+        return new byte[] {
+                (byte)value,
+                (byte)(value >> 8),
+                (byte)(value >> 16)};
+    }
+
+
     /**
      * Returns a byte array with length = 4
      * @param value

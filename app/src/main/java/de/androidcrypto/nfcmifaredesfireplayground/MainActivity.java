@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -27,6 +28,10 @@ import com.github.skjolber.desfire.ev1.model.DesfireApplicationKeySettings;
 import com.github.skjolber.desfire.ev1.model.DesfireTag;
 import com.github.skjolber.desfire.ev1.model.command.DefaultIsoDepAdapter;
 import com.github.skjolber.desfire.ev1.model.command.DefaultIsoDepWrapper;
+import com.github.skjolber.desfire.ev1.model.command.IsoDepAdapter;
+import com.github.skjolber.desfire.ev1.model.command.IsoDepWrapper;
+import com.github.skjolber.desfire.ev1.model.file.DesfireFile;
+import com.github.skjolber.desfire.ev1.model.file.DesfireFileCommunicationSettings;
 import com.github.skjolber.desfire.libfreefare.MifareTag;
 
 import java.io.ByteArrayOutputStream;
@@ -41,14 +46,19 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import nfcjlib.core.DESFireAdapter;
 import nfcjlib.core.DESFireEV1;
+import nfcjlib.core.KeyType;
 import nfcjlib.core.util.AES;
+import nfcjlib.core.util.CRC32;
 import nfcjlib.core.util.TripleDES;
 
 
 public class MainActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback {
 
-    Button btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13, btn14, btn15, btn16, btn17, btn18, btn19, btn20, btn21;
+    private final String TAG = "Main";
+
+    Button btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13, btn14, btn15, btn16, btn17, btn18, btn19, btn20, btn21, btn22, btn23;
     EditText tagId, dataToWrite, readResult;
     private NfcAdapter mNfcAdapter;
     byte[] tagIdByte;
@@ -57,7 +67,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     // vars for enhanced functions using libraries from https://github.com/skjolber/desfire-tools-for-android
     private MifareTag nfcjTag;
     private DesfireTag desfireTag;
-    private DefaultIsoDepAdapter defaultIsoDepAdapter;
+    //private DefaultIsoDepAdapter defaultIsoDepAdapter;
+    private DESFireAdapter desFireAdapter;
 
     /**
      * Note on all KEY data (important for DES/TDES keys only)
@@ -130,6 +141,13 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private final byte DesLogCyclicFileFileNumber = (byte) 0x04;
     private final byte DesLogCyclicFileNumberOfRecords = (byte) 0x06; // 5 records (+1 record as spare record for writing data before committing), fixed for this method
 
+    /**
+     * The following constants are global defined and got updated through several steps on ENCRYPTION and DECRYPTION
+     */
+    private KeyType ktype;    // type of key used for authentication
+    private byte[] iv;        // the IV, kept updated between operations (for 3K3DES/AES)
+    private byte[] skey;      // session key: set on successful authentication
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -158,6 +176,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         btn19 = findViewById(R.id.btn19);
         btn20 = findViewById(R.id.btn20);
         btn21 = findViewById(R.id.btn21);
+        btn22 = findViewById(R.id.btn22);
+        btn23 = findViewById(R.id.btn23);
+
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
         btn2.setOnClickListener(new View.OnClickListener() {
@@ -658,9 +679,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 DESFireEV1 desfire = new DESFireEV1();
                 try {
                     // set adapter
-                    desfire.setAdapter(defaultIsoDepAdapter);
+                    //desfire.setAdapter(defaultIsoDepAdapter);
+                    //desfire.setAdapter(defaultIsoDepAdapter);
+                    desfire.setAdapter(desFireAdapter);
                     // public boolean authenticate(byte[] key, byte keyNo, DesfireKeyType type) throws IOException {
-                    boolean suc = desfire.authenticate(new byte[24], (byte) 0, DESFireEV1.DesfireKeyType.TKTDES);
+                    boolean suc = desfire.authenticate(new byte[24], (byte) 0, KeyType.TKTDES);
                     writeToUiAppend(readResult, "suc in auth for " + suc);
 
                 } catch (IOException e) {
@@ -980,7 +1003,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 DESFireEV1 desFireEV1 = new DESFireEV1();
                 try {
                     // set adapter
-                    desFireEV1.setAdapter(defaultIsoDepAdapter);
+                    //desFireEV1.setAdapter(defaultIsoDepAdapter);
+                    desFireEV1.setAdapter(desFireAdapter);
 
                     // select an application
                     boolean sucSelectApplication = desFireEV1.selectApplication(AID_DesLog);
@@ -991,7 +1015,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     // byte applicationMasterKeySettings = (byte) 0x0f; - the leftmost bits are '0' so it is the appMasterKey ('00') that has tto get used for authorization
 
                     // authenticate with key 0
-                    boolean sucAuthenticateAid = desFireEV1.authenticate(AID_DesLog_Key0, AID_DesLog_Key0_Number, DESFireEV1.DesfireKeyType.DES);
+                    boolean sucAuthenticateAid = desFireEV1.authenticate(AID_DesLog_Key0, AID_DesLog_Key0_Number, KeyType.DES);
                     writeToUiAppend(readResult, "suc in auth for " + sucAuthenticateAid);
 
                     // authenticate with key 1
@@ -1005,7 +1029,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     // change the key
                     // this is the real key used without any keyVersion bits. The new key is automatically stripped off the version bytes but not the old key
                     setKeyVersion(AID_DesLog_Key2_New, 0, AID_DesLog_Key2_New.length, (byte) 0x00);
-                    boolean sucChange = desFireEV1.changeKey(AID_DesLog_Key2_Number, DESFireEV1.DesfireKeyType.DES, AID_DesLog_Key2_New, AID_DesLog_Key2);
+                    boolean sucChange = desFireEV1.changeKey(AID_DesLog_Key2_Number, KeyType.DES, AID_DesLog_Key2_New, AID_DesLog_Key2);
                     //boolean sucChange =  desFireEV1.changeKey(applicationIdentifier_DesLog_Key2_Number, DESFireEV1.DesfireKeyType.DES, applicationIdentifier_DesLog_Key2, applicationIdentifier_DesLog_Key2_New);
 
                     // this is the real key used without any keyVersion bits. The new key is automatically stripped off the version bytes but not the old key
@@ -1168,7 +1192,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 try {
 
                     // set adapter
-                    desfire.setAdapter(defaultIsoDepAdapter);
+                    //desfire.setAdapter(defaultIsoDepAdapter);
+                    desfire.setAdapter(desFireAdapter);
 
                     // select PICC (is selected by default but...)
                     boolean selectMasterApplicationSuccess = desfire.selectApplication(new byte[]{0x00, 0x00, 0x00});
@@ -1183,7 +1208,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
                     //desfire.authenticate(new byte[16], (byte) 0x00, KeyType.AES);
                     //boolean authenticateMasterApplicationSuccess = desfire.authenticate(new byte[16], (byte) 0x00, DESFireEV1.DesfireKeyType.AES);
-                    boolean authenticateMasterApplicationSuccess = desfire.authenticate(new byte[8], (byte) 0x00, DESFireEV1.DesfireKeyType.DES);
+                    boolean authenticateMasterApplicationSuccess = desfire.authenticate(new byte[8], (byte) 0x00, KeyType.DES);
                     writeToUiAppend(readResult, "authenticateMasterApplicationSuccess: " + authenticateMasterApplicationSuccess);
                     if (!authenticateMasterApplicationSuccess) {
                         writeToUiAppend(readResult, "authenticateMasterApplication NOT Success, aborted");
@@ -1206,7 +1231,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     byte fileNumber = (byte) 0x01;
                     //boolean createApplication = desfire.createApplication(aid, applicationMasterKeySettings, DESFireEV1.DesfireKeyType.AES, numberOfKeys);
                     //boolean createApplication = desfire.createApplication(aid, applicationMasterKeySettings, DESFireEV1.DesfireKeyType.TKTDES, numberOfKeys);
-                    boolean createApplication = desfire.createApplication(aid, applicationMasterKeySettings, DESFireEV1.DesfireKeyType.DES, numberOfKeys);
+                    boolean createApplication = desfire.createApplication(aid, applicationMasterKeySettings, KeyType.DES, numberOfKeys);
                     writeToUiAppend(readResult, "createApplication: " + createApplication);
 
                     // select an application
@@ -1216,7 +1241,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     // authenticate
                     //boolean auth = desfire.authenticate(aesKey, aesKeyNumber, DESFireEV1.DesfireKeyType.AES);
                     //boolean auth = desfire.authenticate(tkdesKey, aesKeyNumber, DESFireEV1.DesfireKeyType.TKTDES);
-                    boolean auth = desfire.authenticate(desKey, aesKeyNumber, DESFireEV1.DesfireKeyType.DES);
+                    boolean auth = desfire.authenticate(desKey, aesKeyNumber, KeyType.DES);
 
                     writeToUiAppend(readResult, "authenticateApplication: " + auth);
 
@@ -1283,12 +1308,12 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     //payloadStandardFile[6] = 0; // is 0x00
                     System.arraycopy(dataByte, 0, payloadWriteData, 7, dataByte.length);
                     /*
-                    	 * @param payload	a byte array with the following contents:
-	 * 					<br>file number (1 byte),
-	 * 					<br>offset within the file being written (3 bytes LSB),
-	 * 					<br>length of the data (3 byte LSB),
-	 * 					<br>the data (1+ bytes)
-	                      */
+                     * @param payload	a byte array with the following contents:
+                     * 					<br>file number (1 byte),
+                     * 					<br>offset within the file being written (3 bytes LSB),
+                     * 					<br>length of the data (3 byte LSB),
+                     * 					<br>the data (1+ bytes)
+                     */
                     /*
                     writeToUiAppend(readResult, printData("payloadWriteData", payloadWriteData));
                     boolean writeData = desfire.writeData(payloadWriteData);
@@ -1358,7 +1383,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
  */
 
                     // write to cyclic file with own method
-                    writeToUiAppend(readResult,"");
+                    writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "write to Cyclic Record File own");
                     byte[] responseData = new byte[2];
                     boolean writeCyc = writeToCyclicFile(readResult, fileNumber, responseData);
@@ -1367,7 +1392,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                     writeToUiAppend(readResult, "writeCycCommit: " + writeCycCommit + " response: " + Utils.bytesToHex(responseData));
 
                     // write to cyclic file desfire
-                    writeToUiAppend(readResult,"");
+                    writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "write to Cyclic Record File DesfireEV1");
                     //byte[] writeCycPayload = new byte[1];
                     byte[] offsetZero = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // write to the beginning
@@ -1391,7 +1416,6 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                     }
 
 
-
                     // now desfire method to read
                     /*
                     byte[] dataRead = desfire.readData(fileNumber, 0, 0);
@@ -1405,7 +1429,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                     // my manua comm: 90 bb 0000 07 04 04000001000000
 
                     // now desfire method to read second try
-                    writeToUiAppend(readResult,"");
+                    writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "write to Cyclic Record File DesfireEV1");
                     byte[] dataRead2 = desfire.readRecords(fileNumber, 0, 1);
                     writeToUiAppend(readResult, printData("dataRead2", dataRead2));
@@ -1419,7 +1443,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
 
                     /// my method
                     // define some data
-                    writeToUiAppend(readResult,"");
+                    writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "write to Cyclic Record File own");
                     byte[] recordNumber = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // record 0 is the youngest record
                     byte[] numberOfRecordsMy = new byte[]{(byte) 0x01, (byte) 0x00, (byte) 0x00}; // read just one record
@@ -1470,7 +1494,8 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                 try {
 
                     // set adapter
-                    desfire.setAdapter(defaultIsoDepAdapter);
+                    //desfire.setAdapter(defaultIsoDepAdapter);
+                    desfire.setAdapter(desFireAdapter);
 
                     byte[] aid = Utils.hexStringToByteArray("c3c2c1");
                     byte[] desKey = new byte[8];
@@ -1495,7 +1520,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                     }
 
                     // auth
-                    boolean authenticateMasterApplicationSuccess = desfire.authenticate(desKey, (byte) 0x00, DESFireEV1.DesfireKeyType.DES);
+                    boolean authenticateMasterApplicationSuccess = desfire.authenticate(desKey, (byte) 0x00, KeyType.DES);
                     //boolean authenticateMasterApplicationSuccess = desfire.authenticate(new byte[8], (byte) 0x00, DESFireEV1.DesfireKeyType.DES);
                     writeToUiAppend(readResult, "authenticateMasterApplicationSuccess: " + authenticateMasterApplicationSuccess);
                     if (!authenticateMasterApplicationSuccess) {
@@ -1517,16 +1542,16 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
 
                     // authenticate with desfire method
                     // authenticate inside application with key 0x00 and cipher 3K3DES
-                    boolean authenticateApplicationSuccess = desfire.authenticate(aesKey, aesKeyNumberRW, DESFireEV1.DesfireKeyType.AES);
+                    boolean authenticateApplicationSuccess = desfire.authenticate(aesKey, aesKeyNumberRW, KeyType.AES);
                     writeToUiAppend(readResult, "authenticateApplicationSuccess: " + authenticateApplicationSuccess);
                     if (!authenticateApplicationSuccess) {
-                        writeToUiAppend(readResult,"authenticateApplication NOT Success, aborted");
+                        writeToUiAppend(readResult, "authenticateApplication NOT Success, aborted");
                         return;
                     }
 
                     // create the standard file
                     responseData = new byte[2];
-                    boolean createStandardFileSuccess = createStandardFile(readResult, aesFileNumberStandard    , responseData);
+                    boolean createStandardFileSuccess = createStandardFile(readResult, aesFileNumberStandard, responseData);
                     writeToUiAppend(readResult, "createStandardFile result: " + createStandardFileSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!createStandardFileSuccess) {
                         writeToUiAppend(readResult, "the createStandardFile was not successful, aborted");
@@ -1543,9 +1568,6 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                     }
 
 
-
-
-
                     // get the file settings for the new file
                     responseData = new byte[2];
                     byte[] fileSettingsRecord = getFileSettingsRecord(readResult, DesStandardFileFileNumber1, responseData);
@@ -1555,8 +1577,6 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                         return;
                     }
                     byte[] fileSettingsData = Arrays.copyOf(fileSettingsRecord, fileSettingsRecord.length - 2);
-
-
 
 
                 } catch (IOException e) {
@@ -1879,7 +1899,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                 writeToUiAppend(readResult, "*** authenticate the application using DESFireEV1 method ***");
                 boolean authenticateAesApplicationDfSuccess = false;
                 try {
-                    authenticateAesApplicationDfSuccess = authenticate(aesKey, aesKeyNumberRW, DESFireEV1.DesfireKeyType.AES);
+                    authenticateAesApplicationDfSuccess = authenticate(aesKey, aesKeyNumberRW, KeyType.AES);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -1974,7 +1994,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                     writeToUiAppend(readResult, "the selectApplication was not successful, aborted");
                     return;
                 }
-
+/*
                 // authenticate
                 responseData = new byte[2];
                 // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
@@ -1984,21 +2004,10 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                     writeToUiAppend(readResult, "the authenticateAesApplication was not successful, aborted");
                     //return;
                 }
+*/
 
-                writeToUiAppend(readResult, "");
-                writeToUiAppend(readResult, "*** authenticate the application using DESFireEV1 method ***");
-                boolean authenticateAesApplicationDfSuccess = false;
-                try {
-                    authenticateAesApplicationDfSuccess = authenticate(aesKey, aesKeyNumberRW, DESFireEV1.DesfireKeyType.AES);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                writeToUiAppend(readResult, "authenticateAesApplicationDf result: " + authenticateAesApplicationDfSuccess + " with response: " + Utils.bytesToHex(responseData));
-                if (!authenticateAesApplicationDfSuccess) {
-                    writeToUiAppend(readResult, "the authenticateAesApplicationDf was not successful, aborted");
-                    //return;
-                }
 
+  /*
                 // create the cyclic file - here with encrypted communication
                 responseData = new byte[2];
                 boolean createCyclicFileSuccess = createCyclicFileEncryptedCommunication(readResult, aesFileNumberCycle, responseData);
@@ -2007,7 +2016,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                     writeToUiAppend(readResult, "createCyclicFile was not successful, aborted");
                     //return;
                 }
-
+*/
                 // encryption code (preprocessing)
                 // preprocessing see line 1514: private byte[] preprocessEnciphered(byte[] apdu, int offset) {
                 // for encryption of send apdu see line 1767: private static byte[] encryptApdu(byte[] apdu, int offset, byte[] sessionKey, byte[] iv, DesfireKeyType type) {
@@ -2018,14 +2027,13 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                 // postprocessing see line 1633: private byte[] postprocessEnciphered(byte[] apdu, int length) {
                 // for decryption of receivedApdu see line 2097 in AES class: public static byte[] decrypt(byte[] myIV, byte[] myKey, byte[] myMsg) {
                 // for CRC see line 1758: private static byte[] calculateApduCRC32R(byte[] apdu, int length) {
-
-
-                // write to the cyclic file
+/*
+                // write to the cyclic file with encrypted data
                 responseData = new byte[2];
-                boolean writeToCyclicFileSuccess = writeToCyclicFile(readResult, aesFileNumberCycle, responseData);
-                writeToUiAppend(readResult, "writeToCyclicFile success: " + writeToCyclicFileSuccess + " with response: " + Utils.bytesToHex(responseData));
-                if (!writeToCyclicFileSuccess) {
-                    writeToUiAppend(readResult, "writeToCyclicFile was not successful, aborted");
+                boolean writeToCyclicFileEncryptedSuccess = writeToCyclicFileEncrypted(readResult, aesFileNumberCycle, responseData);
+                writeToUiAppend(readResult, "writeToCyclicFileEncrypted success: " + writeToCyclicFileEncryptedSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!writeToCyclicFileEncryptedSuccess) {
+                    writeToUiAppend(readResult, "writeToCyclicFileEncrypted was not successful, aborted");
                     //return;
                 }
                 // commit in cyclic file
@@ -2036,10 +2044,335 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                     writeToUiAppend(readResult, "writeToFileCommit was not successful, aborted");
                     //return;
                 }
+*/
+                DESFireEV1 desfire = new DESFireEV1();
+                //desfire.setAdapter(defaultIsoDepAdapter);
+                desfire.setAdapter(desFireAdapter);
+
+                try {
+
+                    // complete reading
+                    boolean dfSelectM = desfire.selectApplication(AID_Master);
+                    writeToUiAppend(readResult, "dfSelectMResult: " + dfSelectM);
+
+                    boolean dfAuthM = desfire.authenticate(new byte[8], (byte) 0, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthMReadResult: " + dfAuthM);
+
+                    byte[] aesAidStandard = Utils.hexStringToByteArray("c3c2c9");
+                    byte aesFileNumberStandard = (byte) 0x03;
+                    byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                    boolean dfCreateStandard = desfire.createApplication(aesAidStandard, applicationMasterKeySettings, KeyType.AES, (byte) 3);
+                    writeToUiAppend(readResult, "dfCreateStandardResult: " + dfCreateStandard);
+
+                    boolean dfSelectStandard = desfire.selectApplication(aesAidStandard);
+                    writeToUiAppend(readResult, "dfSelectStandardResult: " + dfSelectStandard);
+
+                    boolean dfAuthStandard = desfire.authenticate(aesKey, aesKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthReadStandardResult: " + dfAuthStandard);
+
+                    byte communicationSettings = (byte) 0x03; // full encrypted
+                    byte accessRightsRwCar = (byte) 0x00; // Read&Write Access & ChangeAccessRights
+                    byte accessRightsRW = (byte) 0x00; // Read Access & Write Access // read with key 0, write with key 0
+                    byte[] fileSize = new byte[]{(byte) 0x20, (byte) 0xf00, (byte) 0x00}; // 32 bytes
+                    byte[] payloadStandardFile = new byte[7];
+                    payloadStandardFile[0] = aesFileNumberStandard; // fileNumber
+                    payloadStandardFile[1] = communicationSettings;
+                    payloadStandardFile[2] = accessRightsRwCar;
+                    payloadStandardFile[3] = accessRightsRW;
+                    System.arraycopy(fileSize, 0, payloadStandardFile, 4, 3);
+                    writeToUiAppend(readResult, printData("payloadStandardFile", payloadStandardFile));
+                    boolean dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
+                    writeToUiAppend(readResult, "dfCreateStandardFileResult: " + dfCreateStandardFile);
+
+                    // auh ?
+
+                    // byte[] payloadWriteData;
+                    byte[] dataByte = "hello".getBytes(StandardCharsets.UTF_8); // 5 bytes long
+                    byte[] offset = new byte[]{(byte) 0x00, (byte) 0xf00, (byte) 0x00}; // write at the beginning
+                    byte lengthOfData = (byte) (dataByte.length & 0xFF);
+                    byte[] payloadWriteData = new byte[7 + dataByte.length]; // 7 + length of data
+                    payloadWriteData[0] = (byte) aesFileNumberStandard; // fileNumber
+                    System.arraycopy(offset, 0, payloadWriteData, 1, 3);
+                    payloadWriteData[4] = lengthOfData;
+                    //payloadStandardFile[5] = 0; // is 0x00
+                    //payloadStandardFile[6] = 0; // is 0x00
+                    System.arraycopy(dataByte, 0, payloadWriteData, 7, dataByte.length);
+                    writeToUiAppend(readResult, printData("payloadWriteData", payloadWriteData));
+                    boolean dfWriteStandard = desfire.writeData(payloadWriteData);
+                    writeToUiAppend(readResult, "dfWriteStandardResult: " + dfWriteStandard);
+
+
+                    // rough end
+                    if (desfire != null) return;
+
+
+                    boolean dfSelect = desfire.selectApplication(aesAid);
+                    writeToUiAppend(readResult, "dfSelectResult: " + dfSelect);
+
+                    boolean dfAuth = desfire.authenticate(aesKey, aesKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthReadResult: " + dfAuth);
+
+                    DesfireFile fs = desfire.getFileSettings(aesFileNumberCycle);
+                    writeToUiAppend(readResult, "fs: " + fs.toString());
+
+/*
+fs: RecordDesfireFile [recordSize=32, maxRecords=6, currentRecords=0, records=null, fileType=CYCLIC_RECORD_FILE,
+communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAccessKey=0, changeAccessKey=0, id=2]
+ */
+
+                    //writeToUiAppend(readResult, "kno: " + desfire.getKno());
+
+                    // build payload for Cyclic Record
+                    byte[] offsetZero = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // write to the beginning
+                    String contentString = "Entry from " + Utils.getTimestamp(); // timestamp is 19 characters long
+                    int contentLengthInt = contentString.length();
+                    // todo be more universal with this. The created record size is 32 so this data is fitting into one record
+                    byte[] contentLength = new byte[]{(byte) (contentLengthInt & 0xFF), (byte) 0x00, (byte) 0x00};
+                    byte[] content = contentString.getBytes(StandardCharsets.UTF_8);
+                    byte[] writeFileParameters = new byte[(contentLengthInt + 7)];
+                    writeFileParameters[0] = aesFileNumberCycle;
+                    System.arraycopy(offsetZero, 0, writeFileParameters, 1, 3);
+                    System.arraycopy(contentLength, 0, writeFileParameters, 4, 3);
+                    System.arraycopy(content, 0, writeFileParameters, 7, contentLengthInt);
+                    writeToUiAppend(readResult, printData("writeCycleFileParameters DesfireEV1", writeFileParameters));
+
+                    boolean dfWrite = desfire.writeRecord(writeFileParameters);
+                    writeToUiAppend(readResult, "dfWrite: " + dfWrite);
+
+
+                } catch (IOException e) {
+                    writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
+                } catch (Exception e) {
+                    writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
+                }
+
+
+
+
+                /* using in MainActivity
+                writeToUiAppend(readResult, "");
+                writeToUiAppend(readResult, "*** authenticate the application using DESFireEV1 method ***");
+                boolean authenticateAesApplicationDfSuccess = false;
+                try {
+                    //authenticateAesApplicationDfSuccess = authenticate(aesKey, aesKeyNumberRW, DESFireEV1.DesfireKeyType.AES);
+                    authenticateAesApplicationDfSuccess =  authenticate(aesKey, aesKeyNumberRW, DESFireEV1.DesfireKeyType.AES);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                writeToUiAppend(readResult, "authenticateAesApplicationDf result: " + authenticateAesApplicationDfSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateAesApplicationDfSuccess) {
+                    writeToUiAppend(readResult, "the authenticateAesApplicationDf was not successful, aborted");
+                    //return;
+                }
+
+                 */
+
+
 
             }
         });
 
+        btn22.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // auth with DES keys but unencrypted
+
+                // first we setup a des-key secured application
+                byte[] responseData = new byte[2];
+
+                DESFireEV1 desfire = new DESFireEV1();
+                //desfire.setAdapter(defaultIsoDepAdapter);
+                desfire.setAdapter(desFireAdapter);
+
+                try {
+
+                    // complete reading
+                    boolean dfSelectM = desfire.selectApplication(AID_Master);
+                    writeToUiAppend(readResult, "dfSelectMResult: " + dfSelectM);
+
+                    boolean dfAuthM = desfire.authenticate(new byte[8], (byte) 0, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthMReadResult: " + dfAuthM);
+
+                    byte[] desAidStandard = Utils.hexStringToByteArray("838281");
+                    byte[] desKey = new byte[8];
+                    byte desKeyNumberRW = (byte) 0;
+                    byte desFileNumberStandard = (byte) 0x01;
+                    byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                    boolean dfCreateStandard = desfire.createApplication(desAidStandard, applicationMasterKeySettings, KeyType.DES, (byte) 3);
+                    writeToUiAppend(readResult, "dfCreateStandardResult: " + dfCreateStandard);
+
+                    boolean dfSelectStandard = desfire.selectApplication(desAidStandard);
+                    writeToUiAppend(readResult, "dfSelectStandardResult: " + dfSelectStandard);
+
+                    boolean dfAuthStandard = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthReadStandardResult: " + dfAuthStandard);
+
+                    byte communicationSettings = (byte) 0x0; // plain
+                    byte accessRightsRwCar = (byte) 0x00; // Read&Write Access & ChangeAccessRights
+                    byte accessRightsRW = (byte) 0x00; // Read Access & Write Access // read with key 0, write with key 0
+                    byte[] fileSize = new byte[]{(byte) 0x20, (byte) 0xf00, (byte) 0x00}; // 32 bytes
+                    byte[] payloadStandardFile = new byte[7];
+                    payloadStandardFile[0] = desFileNumberStandard; // fileNumber
+                    payloadStandardFile[1] = communicationSettings;
+                    payloadStandardFile[2] = accessRightsRwCar;
+                    payloadStandardFile[3] = accessRightsRW;
+                    System.arraycopy(fileSize, 0, payloadStandardFile, 4, 3);
+                    writeToUiAppend(readResult, printData("payloadStandardFile", payloadStandardFile));
+                    boolean dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
+                    writeToUiAppend(readResult, "dfCreateStandardFileResult: " + dfCreateStandardFile);
+
+                    // auth
+                    boolean dfAuth1 = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthReadResult: " + dfAuth1);
+/*
+                    // byte[] payloadWriteData;
+                    byte[] dataByte = "hello".getBytes(StandardCharsets.UTF_8); // 5 bytes long
+                    byte[] offset = new byte[]{(byte) 0x00, (byte) 0xf00, (byte) 0x00}; // write at the beginning
+                    byte lengthOfData = (byte) (dataByte.length & 0xFF);
+                    byte[] payloadWriteData = new byte[7 + dataByte.length]; // 7 + length of data
+                    payloadWriteData[0] = (byte) desFileNumberStandard; // fileNumber
+                    System.arraycopy(offset, 0, payloadWriteData, 1, 3);
+                    payloadWriteData[4] = lengthOfData;
+                    //payloadStandardFile[5] = 0; // is 0x00
+                    //payloadStandardFile[6] = 0; // is 0x00
+                    System.arraycopy(dataByte, 0, payloadWriteData, 7, dataByte.length);
+                    writeToUiAppend(readResult, printData("payloadWriteData", payloadWriteData));
+                    boolean dfWriteStandard = desfire.writeData(payloadWriteData);
+                    writeToUiAppend(readResult, "dfWriteStandardResult: " + dfWriteStandard);
+*/
+                    /*
+                    // is my own write method
+                    responseData = new byte[2];
+                    boolean writeStandardFileSuccess = writeToStandardFile(readResult, desFileNumberStandard, "88887777".getBytes(StandardCharsets.UTF_8), responseData);
+                    writeToUiAppend(readResult, "writeStandardFile result: " + writeStandardFileSuccess + " with response: " + Utils.bytesToHex(responseData));
+                    if (!writeStandardFileSuccess) {
+                        writeToUiAppend(readResult, "the writeStandardFile was not successful, aborted");
+                        //return;
+                    }
+
+                     */
+/*
+Desfire write 1942: private boolean write(byte[] payload, byte cmd) throws Exception {
+
+
+
+
+working
+send APDU length: 21 data: 903d00000f01000000080000383838383737373700
+writeStandardFileResponse length: 2 data: 9100
+ */
+
+                    // reader part
+                    boolean dfSelect = desfire.selectApplication(desAidStandard);
+                    writeToUiAppend(readResult, "dfSelectResult: " + dfSelect);
+
+                    boolean dfAuth = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthReadResult: " + dfAuth);
+/*
+                    // my own read method
+                    // read from standard file
+                    responseData = new byte[2];
+                    byte[] readStandardFile = readFromStandardFile(readResult, desFileNumberStandard, responseData);
+                    writeToUiAppend(readResult, printData("readStandardFile", readStandardFile) + " with response: " + Utils.bytesToHex(responseData));
+                    if (!checkResponse(responseData)) {
+                        writeToUiAppend(readResult, "the readStandardFile was not successful, aborted");
+                    } else {
+                        writeToUiAppend(readResult, "readStandardFileResponse: " + new String(readStandardFile, StandardCharsets.UTF_8));
+                    }
+*/
+/*
+read in Desfire line 1860 private byte[] read(byte fileNumber, int offset, int length, int cmd) throws Exception {
+
+                           90bd 000007 01 000000 000020 00
+working own:
+send APDU length: 13 data: 90bd 000007 01 000000 200000 00
+
+readStandardFileResponse length: 34 data: 38383838373737370000000000000000000000000000000000000000000000009100
+readStandardFile length: 32 data: 3838383837373737000000000000000000000000000000000000000000000000 with response: 9100
+readStandardFileResponse: 88887777????????????????????????????????????????????????
+ */
+
+                    // get the maximal length from getFileSettings
+                    byte[] readStandard = desfire.readData(desFileNumberStandard, (byte) 0x00, (byte) 0x20);
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+
+
+
+/*
+fs: RecordDesfireFile [recordSize=32, maxRecords=6, currentRecords=0, records=null, fileType=CYCLIC_RECORD_FILE,
+communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAccessKey=0, changeAccessKey=0, id=2]
+ */
+
+                    /*
+                    writeToUiAppend(readResult, "kno: " + desfire.getKno());
+
+                    // build payload for Cyclic Record
+                    byte[] offsetZero = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // write to the beginning
+                    String contentString = "Entry from " + Utils.getTimestamp(); // timestamp is 19 characters long
+                    int contentLengthInt = contentString.length();
+                    // todo be more universal with this. The created record size is 32 so this data is fitting into one record
+                    byte[] contentLength = new byte[]{(byte) (contentLengthInt & 0xFF), (byte) 0x00, (byte) 0x00};
+                    byte[] content = contentString.getBytes(StandardCharsets.UTF_8);
+                    byte[] writeFileParameters = new byte[(contentLengthInt + 7)];
+                    writeFileParameters[0] = aesFileNumberCycle;
+                    System.arraycopy(offsetZero, 0, writeFileParameters, 1, 3);
+                    System.arraycopy(contentLength, 0, writeFileParameters, 4, 3);
+                    System.arraycopy(content, 0, writeFileParameters, 7, contentLengthInt);
+                    writeToUiAppend(readResult, printData("writeCycleFileParameters DesfireEV1", writeFileParameters));
+
+                    boolean dfWrite = desfire.writeRecord(writeFileParameters);
+                    writeToUiAppend(readResult, "dfWrite: " + dfWrite);
+                    */
+
+
+                } catch (IOException e) {
+                    writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
+                } catch (Exception e) {
+                    writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
+                }
+
+
+
+
+            }
+        });
+
+    }
+
+    // a simplified run
+    private void writeToStandardFile() {
+        String data = dataToWrite.getText().toString();
+        if (TextUtils.isEmpty(data)) {
+            Toast.makeText(getApplicationContext(),
+                    "please enter some data to write on tag",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        /*
+        // select the application
+        byte[] responseData = new byte[2];
+        boolean success = selectApplicationDes(readResult, AID_DesStandard, responseData);
+        writeToUiAppend(readResult, "selectApplication success: " + success + " with response: " + Utils.bytesToHex(responseData));
+
+        // authenticate
+        responseData = new byte[2];
+        // we set the rw + car rights to key 0 and read rights to key1, so we need to authenticate with key 2 (write rights) first to proceed
+        boolean authenticateSuccess = authenticateApplicationDes(readResult, AID_DesStandard_Key2_Number, AID_DesStandard_Key2, false, responseData);
+        writeToUiAppend(readResult, "authenticateApplication result: " + success + " with response: " + Utils.bytesToHex(responseData));
+        if (!authenticateSuccess) {
+            writeToUiAppend(readResult, "the authentication was not successful, aborted");
+            return;
+        }
+*/
+        // write to standard file
+        byte[] responseData = new byte[2];
+        responseData = new byte[2];
+        boolean writeStandardFileSuccess = writeToStandardFile(readResult, DesStandardFileFileNumber1, data.getBytes(StandardCharsets.UTF_8), responseData);
+        writeToUiAppend(readResult, "writeStandardFile result: " + writeStandardFileSuccess + " with response: " + Utils.bytesToHex(responseData));
+        if (!writeStandardFileSuccess) {
+            writeToUiAppend(readResult, "the writeStandardFile was not successful, aborted");
+            return;
+        }
 
     }
 
@@ -2054,24 +2387,24 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
     /**
      * Mutual authentication between PCD and PICC.
      *
-     * @param key	the secret key (8 bytes for DES, 16 bytes for 3DES/AES and
-     * 				24 bytes for 3K3DES)
-     * @param keyNo	the key number
-     * @param type	the cipher
-     * @return		true for success
+     * @param key   the secret key (8 bytes for DES, 16 bytes for 3DES/AES and
+     *              24 bytes for 3K3DES)
+     * @param keyNo the key number
+     * @param type  the cipher
      * @throws IOException
+     * @return true for success
      */
-    public boolean authenticate(byte[] key, byte keyNo, DESFireEV1.DesfireKeyType type) throws IOException {
+    public boolean authenticate(byte[] key, byte keyNo, KeyType type) throws IOException {
         if (!validateKey(key, type)) {
             System.out.println("***DESFireEV1.java authenticate validateKey: " + com.github.skjolber.desfire.ev1.model.command.Utils.getHexString(key));
             throw new IllegalArgumentException();
         }
-        if (type != DESFireEV1.DesfireKeyType.AES) {
+        if (type != KeyType.AES) {
             // remove version bits from Triple DES keys
             setKeyVersion(key, 0, key.length, (byte) 0x00);
         }
 
-        final byte[] iv0 = type == DESFireEV1.DesfireKeyType.AES ? new byte[16] : new byte[8];
+        final byte[] iv0 = type == KeyType.AES ? new byte[16] : new byte[8];
         byte[] apdu;
         byte[] responseAPDU;
 
@@ -2099,9 +2432,9 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         apdu[5] = keyNo;
         //responseAPDU = transmit(apdu);
 
-        writeToUiAppend(readResult,printData("1st message exchange send", apdu));
+        writeToUiAppend(readResult, printData("1st message exchange send", apdu));
         responseAPDU = isoDep.transceive(apdu);
-        writeToUiAppend(readResult,printData("1st message exchange resp", responseAPDU));
+        writeToUiAppend(readResult, printData("1st message exchange resp", responseAPDU));
         //this.code = getSW2(responseAPDU);
         //feedback(apdu, responseAPDU);
         //if (getSW2(responseAPDU) != 0xAF) return false;
@@ -2111,21 +2444,21 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         // step 3
         //byte[] randB = recv(key, getData(responseAPDU), type, iv0);
         byte[] randB = recv(key, responseData, type, iv0);
-        writeToUiAppend(readResult,"step 3");
-        writeToUiAppend(readResult,printData("randB", randB));
-        writeToUiAppend(readResult,printData("iv0", iv0));
+        writeToUiAppend(readResult, "step 3");
+        writeToUiAppend(readResult, printData("randB", randB));
+        writeToUiAppend(readResult, printData("iv0", iv0));
 
         if (randB == null)
             return false;
         byte[] randBr = rotateLeft(randB);
-        writeToUiAppend(readResult,printData("rotate left randB", randB));
+        writeToUiAppend(readResult, printData("rotate left randB", randB));
 
         byte[] randA = new byte[randB.length];
 
         //fillRandom(randA);
         // we are using a static randA
         randA = Utils.hexStringToByteArray("000102030405060708090a0b0c0d0e0f");
-        writeToUiAppend(readResult,printData("randA", randA));
+        writeToUiAppend(readResult, printData("randA", randA));
 
         // step 3: encryption
         writeToUiAppend(readResult, "encryption");
@@ -2141,7 +2474,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
             return false;
         writeToUiAppend(readResult, printData("ciphertext", ciphertext));
         // 2nd message exchange
-        writeToUiAppend(readResult,"2nd message exchange");
+        writeToUiAppend(readResult, "2nd message exchange");
         apdu = new byte[5 + ciphertext.length + 1];
         apdu[0] = (byte) 0x90;
         apdu[1] = (byte) 0xAF;
@@ -2149,8 +2482,8 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         System.arraycopy(ciphertext, 0, apdu, 5, ciphertext.length);
         //responseAPDU = transmit(apdu);
         responseAPDU = isoDep.transceive(apdu);
-        writeToUiAppend(readResult,printData("2nd message exchange send", apdu));
-        writeToUiAppend(readResult,printData("2nd message exchange resp", responseAPDU));
+        writeToUiAppend(readResult, printData("2nd message exchange send", apdu));
+        writeToUiAppend(readResult, printData("2nd message exchange resp", responseAPDU));
         //this.code = getSW2(responseAPDU);
         //feedback(apdu, responseAPDU);
         //if (getSW2(responseAPDU) != 0x00) return false;
@@ -2198,7 +2531,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
     }
 
     // Receiving data that needs decryption.
-    private static byte[] recv(byte[] key, byte[] data, DESFireEV1.DesfireKeyType type, byte[] iv) {
+    private static byte[] recv(byte[] key, byte[] data, KeyType type, byte[] iv) {
         switch (type) {
             case DES:
             case TDES:
@@ -2215,7 +2548,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
     // IV sent is the global one but it is better to be explicit about it: can be null for DES/3DES
     // if IV is null, then it is set to zeros
     // Sending data that needs encryption.
-    private static byte[] send(byte[] key, byte[] data, DESFireEV1.DesfireKeyType type, byte[] iv) {
+    private static byte[] send(byte[] key, byte[] data, KeyType type, byte[] iv) {
         switch (type) {
             case DES:
             case TDES:
@@ -2233,12 +2566,12 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
      * Generate the session key using the random A generated by the PICC and
      * the random B generated by the PCD.
      *
-     * @param randA	the random number A
-     * @param randB	the random number B
-     * @param type	the type of key
-     * @return		the session key
+     * @param randA the random number A
+     * @param randB the random number B
+     * @param type  the type of key
+     * @return the session key
      */
-    private static byte[] generateSessionKey(byte[] randA, byte[] randB, DESFireEV1.DesfireKeyType type) {
+    private static byte[] generateSessionKey(byte[] randA, byte[] randB, KeyType type) {
         byte[] skey = null;
 
         switch (type) {
@@ -2378,9 +2711,14 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
             //System.arraycopy(createApplicationResponse, 0, response, 0, createApplicationResponse.length);
             if (Arrays.equals(rndA, rndAFromCard)) {
                 writeToUiAppend(logTextView, "Authenticated");
+
+                // generate the session key
+                skey = generateSessionKey(rndA, rndB, KeyType.AES);
+                writeToUiAppend(logTextView, printData("## session key ##", skey));
                 return true;
             } else {
                 writeToUiAppend(logTextView, "Authentication failed");
+                skey = null;
                 return false;
                 //System.err.println(" ### Authentication failed. ### ");
                 //log("rndA:" + toHexString(rndA) + ", rndA from Card: " + toHexString(rndAFromCard));
@@ -2398,8 +2736,6 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         // todo set global IV to zero's
 
     }
-
-
 
 
     /**
@@ -2518,7 +2854,6 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         //System.arraycopy(createApplicationResponse, 0, response, 0, createApplicationResponse.length);
         return false;
     }
-
 
 
     /**
@@ -2794,7 +3129,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         // now read from file
         byte readStandardFileCommand = (byte) 0xbd;
         byte[] offset = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // no offset, read from the beginning
-        byte[] length = new byte[]{(byte) 0x20, (byte) 0xf00, (byte) 0x00}; // 32 bytes
+        byte[] length = new byte[]{(byte) 0x20, (byte) 0x00, (byte) 0x00}; // 32 bytes
         byte[] readStandardFileParameters = new byte[7];
         readStandardFileParameters[0] = fileNumber;
         System.arraycopy(offset, 0, readStandardFileParameters, 1, 3);
@@ -2803,6 +3138,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         byte[] readStandardFileResponse = new byte[0];
         try {
             readStandardFileResponse = isoDep.transceive(wrapMessage(readStandardFileCommand, readStandardFileParameters));
+            writeToUiAppend(logTextView, printData("send APDU", wrapMessage(readStandardFileCommand, readStandardFileParameters)));
         } catch (Exception e) {
             //throw new RuntimeException(e);
             writeToUiAppend(readResult, "tranceive failed: " + e.getMessage());
@@ -2838,6 +3174,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         byte[] writeStandardFileResponse = new byte[0];
         try {
             writeStandardFileResponse = isoDep.transceive(wrapMessage(writeStandardFileCommand, writeStandardFileParameters));
+            writeToUiAppend(logTextView, printData("send APDU", wrapMessage(writeStandardFileCommand, writeStandardFileParameters)));
         } catch (Exception e) {
             //throw new RuntimeException(e);
             writeToUiAppend(logTextView, "tranceive failed: " + e.getMessage());
@@ -3203,6 +3540,238 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         }
     }
 
+    private boolean writeToCyclicFileEncrypted(TextView logTextView, byte fileNumber, byte[] response) {
+        // write to the CyclicFile with AES encrypted data
+        byte writeFileCommand = (byte) 0x3b;
+        // byte fileNumberLogCyclicFile; // is defined as constant
+        byte[] offset = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // write to the beginning
+        byte[] dataLength;
+        String contentString = "Entry from " + Utils.getTimestamp(); // timestamp is 19 characters long
+        int contentLengthInt = contentString.length();
+        // todo be more universal with this. The created record size is 32 so this data is fitting into one record
+        byte[] contentLength = new byte[]{(byte) (contentLengthInt & 0xFF), (byte) 0x00, (byte) 0x00};
+        byte[] content = contentString.getBytes(StandardCharsets.UTF_8);
+        byte[] writeFileParameters = new byte[(contentLengthInt + 7)];
+        writeFileParameters[0] = fileNumber;
+        System.arraycopy(offset, 0, writeFileParameters, 1, 3);
+        System.arraycopy(contentLength, 0, writeFileParameters, 4, 3);
+        System.arraycopy(content, 0, writeFileParameters, 7, contentLengthInt);
+        writeToUiAppend(logTextView, printData("writeFileParameters", writeFileParameters));
+
+        // encryption part
+        // as the first 7 bytes (fileNumber (1), offset (3) and length (3)) are not encrypted the encryptionOffset is 7
+        ktype = KeyType.AES;
+        iv = new byte[16];
+        int encryptionOffset = 2;
+        // missing 1 byte at the end ? for encryption ?
+        byte[] encryptedWriteFileParameters = preprocessAes(writeFileParameters, encryptionOffset);
+        writeToUiAppend(logTextView, printData("encrypted writeFileParameters", encryptedWriteFileParameters));
+
+        encryptionOffset = 7;
+        // for encryption we are working with the wrapped message
+        byte[] encryptedWrappedMessage;
+        try {
+            byte[] wrappedMessage = wrapMessage(writeFileCommand, writeFileParameters);
+            writeToUiAppend(logTextView, printData("wrappedMessage", wrappedMessage));
+            encryptedWrappedMessage = preprocessAes(wrappedMessage, encryptionOffset);
+            writeToUiAppend(logTextView, printData("encryptedWrappedMessage", encryptedWrappedMessage));
+        } catch (Exception e) {
+            writeToUiAppend(logTextView, "wrapMessage failed: " + e.getMessage());
+            return false;
+        }
+
+
+
+/*
+encryptionOffset = 7:
+          writeFileParameters length: 37 data: 02 000000 1e0000 456e747279 2066726f6d20323032332e30342e32372031303a32313a3134                  Length 30
+encrypted writeFileParameters length: 45 data: 02 000000 270000 456e747279 a05fe591daa82fbca3e9456a4e53377ef19a23f93c890bfeb226da6a0b7ace5500  Length 38
+
+encryptionOffset = 2:
+          writeFileParameters length: 37 data: 02 000000 1e0000 456e747279 2066726f6d20323032332e30342e32372031303a33303a3238
+encrypted writeFileParameters length: 56 data: 02 000000 320000 8a3486660a1958c18f2f0bef8c708a4f4253e3f56b3f9b20f44c6c687ee1dae10b84344cfe36368df37048395fe6198900
+
+using the complete wrapped message as basis
+encryptionOffset = 10:
+         wrappedMessage length: 43 data: 903b00002502 000000 1e0000 456e74 72792066726f6d20323032332e30342e32372031303a34343a313400
+encryptedWrappedMessage length: 48 data: 903b00002a02 000000 1e0000 456e74 8d200b9eb13c837df58a1c522e43832f6ed459c5439d2cfe09335443cab8ff1500
+writeFileResponse length: 2 data: 91af
+encryptionOffset = 7:
+         wrappedMessage length: 43 data: 903b00002502 000000 1e0000 456e7472792066726f6d20323032332e30342e32372031303a34393a303300
+encryptedWrappedMessage length: 61 data: 903b00003702 000000 1e0000 5e62d29abcf02048b369b6ae0ba030693e03963931845cd5e5730a1cceec9bccaa290362df1e5277846a6acb82afffaa00
+writeFileResponse length: 2 data: 917e length error
+
+
+ */
+
+        // is there an 0x00 at the end from somewhere ? delete it
+        byte[] encryptedWrappedMessageTrimmed = Arrays.copyOf(encryptedWrappedMessage, (encryptedWrappedMessage.length - 1));
+        writeToUiAppend(logTextView, printData("encryptedWrappedMes l-1", encryptedWrappedMessageTrimmed));
+
+
+
+        byte[] writeFileResponse = new byte[0];
+        try {
+            //writeFileResponse = isoDep.transceive(wrapMessage(writeFileCommand, writeFileParameters));
+            //writeFileResponse = isoDep.transceive(wrapMessage(writeFileCommand, encryptedWriteFileParameters));
+            //writeFileResponse = isoDep.transceive(encryptedWrappedMessage);
+            writeFileResponse = isoDep.transceive(encryptedWrappedMessageTrimmed);
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "tranceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(logTextView, printData("writeFileResponse", writeFileResponse));
+        System.arraycopy(returnStatusBytes(writeFileResponse), 0, response, 0, 2);
+        if (checkResponse(writeFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * codes taken from DESFireEV1.java
+     * NOTE: only the AES parts are active, all other modes are commented out - DO NOT USE THEM HERE
+     */
+
+    // encryption code (preprocessing)
+    // preprocessing see line 1514: private byte[] preprocessEnciphered(byte[] apdu, int offset) {
+    // for encryption of send apdu see line 1767: private static byte[] encryptApdu(byte[] apdu, int offset, byte[] sessionKey, byte[] iv, DesfireKeyType type) {
+    // for encryption of sendApdu see line 48 in AES class:public static byte[] encrypt(byte[] myIV, byte[] myKey, byte[] myMsg) {
+    // for crc see line 1744: private static byte[] calculateApduCRC32C(byte[] apdu) {
+
+    // decryption code (postprocessing)
+    // postprocessing see line 1633: private byte[] postprocessEnciphered(byte[] apdu, int length) {
+    // for decryption of receivedApdu see line 2097 in AES class: public static byte[] decrypt(byte[] myIV, byte[] myKey, byte[] myMsg) {
+    // for CRC see line 1758: private static byte[] calculateApduCRC32R(byte[] apdu, int length) {
+
+    /**
+     * Pre-process command APDU before sending it to PICC.
+     * The global IV is updated.
+     *
+     * <p>If not authenticated, the APDU is immediately returned.
+     *
+     * @param apdu     the APDU
+     * @param offset   the offset of data within the command (for enciphered).
+     *                 For example, credit does not encrypt the 1-byte
+     *                 key number so the offset would be 1.
+     * @param commSett the communication mode
+     * @return For PLAIN, returns the APDU. For MACed, returns the
+     * APDU with the CMAC appended. For ENCIPHERED,
+     * returns the ciphered version of the APDU.
+     * If an error occurs, returns <code>null</code>.
+     */
+    private byte[] preprocess(byte[] apdu, int offset, DesfireFileCommunicationSettings commSett) {
+        if (commSett == null) {
+            Log.e(TAG, "preprocess: commSett is null");
+            return null;
+        }
+        if (skey == null) {
+            Log.e(TAG, "preprocess: skey is null");
+            return apdu;
+        }
+
+        switch (commSett) {
+            case PLAIN:
+                //return preprocessPlain(apdu);
+            case PLAIN_MAC:
+                //return preprocessMaced(apdu, offset);
+            case ENCIPHERED:
+                return preprocessEnciphered(apdu, offset);
+            default:
+                return null;  // never reached
+        }
+    }
+
+    // new one, dedicated to AES only by AndroidCrypto
+    private byte[] preprocessAes(byte[] apdu, int offset) {
+        if (skey == null) {
+            Log.e(TAG, "preprocess: skey is null");
+            return apdu;
+        }
+        return preprocessEnciphered(apdu, offset);
+    }
+
+
+    // calculate CRC and append, encrypt, and update global IV
+    private byte[] preprocessEnciphered(byte[] apdu, int offset) {
+        writeToUiAppend(readResult, printData("# preprocessEnciphered apdu", apdu) + " offset " + offset);
+        byte[] ciphertext = encryptApdu(apdu, offset, skey, iv, ktype);
+        writeToUiAppend(readResult, printData("# preprocessEnciphered ciphertext", ciphertext));
+        byte[] ret = new byte[5 + offset + ciphertext.length + 1];
+        System.arraycopy(apdu, 0, ret, 0, 5 + offset);
+        System.arraycopy(ciphertext, 0, ret, 5 + offset, ciphertext.length);
+        ret[4] = (byte) (offset + ciphertext.length);
+
+        if (ktype == KeyType.TKTDES || ktype == KeyType.AES) {
+            iv = new byte[iv.length];
+            System.arraycopy(ciphertext, ciphertext.length - iv.length, iv, 0, iv.length);
+            writeToUiAppend(readResult, printData("# preprocessEnciphered new IV", iv));
+        }
+
+        return ret;
+    }
+
+
+    /* Only data is encrypted. Headers are left out (e.g. keyNo for credit). */
+    private byte[] encryptApdu(byte[] apdu, int offset, byte[] sessionKey, byte[] iv, KeyType type) {
+        writeToUiAppend(readResult, printData("# encryptApdu apdu", apdu) + " offset " + offset);
+        writeToUiAppend(readResult, printData("# encryptApdu sessionKey", sessionKey) + " " + printData("iv", iv));
+        int blockSize = type == KeyType.AES ? 16 : 8;
+        int payloadLen = apdu.length - 6;
+        byte[] crc = null;
+
+        switch (type) {
+            case DES:
+            case TDES:
+                //crc = calculateApduCRC16C(apdu, offset);
+                break;
+            case TKTDES:
+            case AES:
+                crc = calculateApduCRC32C(apdu);
+                break;
+        }
+        writeToUiAppend(readResult, printData("# encryptApdu crc", crc));
+
+        int padding = 0;  // padding=0 if block length is adequate
+        if ((payloadLen - offset + crc.length) % blockSize != 0)
+            padding = blockSize - (payloadLen - offset + crc.length) % blockSize;
+        int ciphertextLen = payloadLen - offset + crc.length + padding;
+        byte[] plaintext = new byte[ciphertextLen];
+        System.arraycopy(apdu, 5 + offset, plaintext, 0, payloadLen - offset);
+        System.arraycopy(crc, 0, plaintext, payloadLen - offset, crc.length);
+        writeToUiAppend(readResult, printData("# encryptApdu plaintext", plaintext));
+        return send(sessionKey, plaintext, type, iv);
+    }
+
+    // uses nfcjLib/util/CRC32.java
+    // CRC32 calculated over INS+header+data
+    private static byte[] calculateApduCRC32C(byte[] apdu) {
+        byte[] data;
+
+        if (apdu.length == 5) {
+            data = new byte[apdu.length - 4];
+        } else {
+            data = new byte[apdu.length - 5];
+            System.arraycopy(apdu, 5, data, 1, apdu.length - 6);
+        }
+        data[0] = apdu[1];
+
+        return CRC32.get(data);
+    }
+
+    // uses nfcjLib/util/CRC32.java
+    private static byte[] calculateApduCRC32R(byte[] apdu, int length) {
+        byte[] data = new byte[length + 1];
+        System.arraycopy(apdu, 0, data, 0, length);// response code is at the end
+        return CRC32.get(data);
+    }
+
+    /**
+     * codes taken from DESFireEV1.java END
+     */
+
     private boolean commitWriteToFile(TextView logTextView, byte[] response) {
         // don't forget to commit all changes
         byte commitCommand = (byte) 0xc7;
@@ -3244,9 +3813,6 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
             //                90 BB 00 0007 01 000000 000001 00
 
             // my manua comm: 90 bb 0000 07 04 040000 010000 00
-
-
-
 
 
             readFileParameters[0] = fileNumber;
@@ -3502,9 +4068,10 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                 });
 
                 // enhanced function
-                DefaultIsoDepWrapper isoDepWrapper = new DefaultIsoDepWrapper(isoDep);
-                defaultIsoDepAdapter = new DefaultIsoDepAdapter(isoDepWrapper, false);
-
+                //DefaultIsoDepWrapper isoDepWrapper = new DefaultIsoDepWrapper(isoDep);
+                //defaultIsoDepAdapter = new DefaultIsoDepAdapter(isoDepWrapper, false);
+                IsoDepWrapper isoDepWrapper1 = new DefaultIsoDepWrapper(isoDep);
+                desFireAdapter = new DESFireAdapter(isoDepWrapper1, true);
 
                 //nfcA.connect();
                 isoDep.connect();
@@ -3512,7 +4079,8 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
                 // enhanced functions
                 nfcjTag = mifare_desfire_tag_new();
                 nfcjTag.setActive(1);
-                nfcjTag.setIo(defaultIsoDepAdapter);
+                //nfcjTag.setIo(defaultIsoDepAdapter);
+                //nfcjTag.setIo(isoDepWrapper1);
                 desfireTag = new DesfireTag();
 
 
@@ -3886,6 +4454,7 @@ payloadCyclicValueFile    length: 10 data: 01000012200000040000
         Cipher cipher = getCipherAes(Cipher.ENCRYPT_MODE, key, IV);
         return cipher.doFinal(data);
     }
+
     private static Cipher getCipherAes(int mode, byte[] key, byte[] IV) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
         SecretKeySpec keySpec = new SecretKeySpec(key, "AES");

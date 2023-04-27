@@ -31,6 +31,8 @@ public class AES {
 			cipher.init(Cipher.ENCRYPT_MODE, sks, iv);
 			cipherText = cipher.doFinal(myMsg);
 		} catch (Exception e) {
+			//TODO: multicatch only Java 1.7+
+			e.printStackTrace();
 			return null;
 		}
 
@@ -56,6 +58,8 @@ public class AES {
 			cipher.init(Cipher.DECRYPT_MODE, sks, iv);
 			plainText = cipher.doFinal(myMsg);
 		} catch (Exception e) {
+			//TODO: multicatch only Java 1.7+
+			//e.printStackTrace();
 			return null;
 		}
 
@@ -83,6 +87,8 @@ public class AES {
 			cipher.init(Cipher.DECRYPT_MODE, sks, iv);
 			plainText = cipher.doFinal(myMsg, offset, length);
 		} catch (Exception e) {
+			//TODO: multicatch only Java 1.7+
+			//e.printStackTrace();
 			return null;
 		}
 

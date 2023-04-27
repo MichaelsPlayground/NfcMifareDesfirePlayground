@@ -79,7 +79,8 @@ public class TripleDES {
 			//plainText = cipher.doFinal(myMsg);
 			plainText = cipher.doFinal(myMsg, offset, length);
 		} catch (Exception e) {
-		    return null;
+			//TODO: multicatch only Java 1.7+
+			e.printStackTrace();
 		}
 
 		return plainText;

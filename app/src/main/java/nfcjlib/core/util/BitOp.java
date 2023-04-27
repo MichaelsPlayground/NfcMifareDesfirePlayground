@@ -15,10 +15,12 @@ public class BitOp {
 	 */
 	public static byte[] intToLsb(int value) {
 		byte[] a = new byte[4];
+
 		for (int i = 0; i < 4; i++) {
 			a[i] = (byte) (value & 0xFF);
 			value >>>= 8;
 		}
+
 		return a;
 	}
 

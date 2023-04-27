@@ -42,7 +42,7 @@ public class CommandBuilder {
 
 		return this;
 	}
-	
+
 	public byte[] bytes() {
 		return command;
 	}
