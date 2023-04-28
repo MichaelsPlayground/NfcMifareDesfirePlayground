@@ -103,7 +103,15 @@ public class Cryp {
 
     public byte[] preprocessPlain(byte[] apdu) {
         if (ktype == KeyType.TKTDES || ktype == KeyType.AES) {
+            System.out.println("*** preprocessPlain start decryption in Cryp ***");
+            System.out.println("* apdu      : " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(apdu));
+            System.out.println("* skey      : " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(skey));
+            System.out.println("* IV        : " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(iv));
             iv = calculateApduCMAC(apdu, skey, iv, ktype);
+            System.out.println("*** preprocessPlain after calculateApdu in Cryp ***");
+            //System.out.println("* ciphertext: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(ciphertext));
+            System.out.println("* skey      : " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(skey));
+            System.out.println("* IV        : " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(iv));
         }
 
         return apdu;
@@ -133,6 +141,11 @@ public class Cryp {
 
         byte[] ciphertext = Arrays.copyOfRange(apdu, 0, apdu.length - 2);
         byte[] plaintext = recv(skey, ciphertext, ktype, iv);
+        if (plaintext != null) {
+            System.out.println("plaintext: " + Utils.bytesToHex(plaintext));
+        } else {
+            System.out.println("plaintext is NULL");
+        }
 
         byte[] crc;
         switch (ktype) {
@@ -152,9 +165,9 @@ public class Cryp {
             if (crc[i] != plaintext[i + length]) {
                 Log.e(TAG, "Received CMAC does not match calculated CMAC.");
                 Log.e(TAG, "HAREDCODED COMMENTED OUT FOR RETURN NULL IN postprocessEnciphered approx line 1631");
-                // todo HAREDCODED COMMENTED OUT FOR RETURN NULL
+                // todo HARDCODED COMMENTED OUT FOR RETURN NULL
                 // IN postprocessEnciphered
-                //return null;
+                return null;
             }
         }
 

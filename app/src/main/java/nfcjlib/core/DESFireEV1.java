@@ -1620,6 +1620,10 @@ public class DESFireEV1 {
 		assert apdu.length >= 2;
 
 		byte[] ciphertext = Arrays.copyOfRange(apdu, 0, apdu.length - 2);
+		System.out.println("*** postprocessEnciphered start decryption in recv ***");
+		System.out.println("* ciphertext: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(ciphertext));
+		System.out.println("* skey      : " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(skey));
+		System.out.println("* IV        : " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(iv));
 		byte[] plaintext = recv(skey, ciphertext, ktype, iv);
 
 		byte[] crc;
