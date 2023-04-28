@@ -2406,16 +2406,6 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                     }
 
 
-
-
-                    /*
-                    WriteCyclicFileBuilderBuilder writeCyclicFileBuilderBuilder = new WriteCyclicFileBuilderBuilder();
-                    writeCyclicFileBuilderBuilder
-                            .setFileNumber(1)
-                            .setContent("abc");
-                    writeToUiAppend(readResult, writeCyclicFileBuilderBuilder.createWriteCyclicFileBuilder().toString());
-*/
-
                 } catch (IOException e) {
                     writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
                 } catch (Exception e) {
