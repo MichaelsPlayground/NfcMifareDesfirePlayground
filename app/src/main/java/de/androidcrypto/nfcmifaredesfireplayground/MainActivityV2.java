@@ -1,8 +1,6 @@
 package de.androidcrypto.nfcmifaredesfireplayground;
 
 import static com.github.skjolber.desfire.libfreefare.MifareDesfire.mifare_desfire_tag_new;
-
-
 import static nfcjlib.core.DESFireEV1.validateKey;
 
 import android.content.Context;
@@ -26,13 +24,10 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.github.skjolber.desfire.ev1.model.DesfireApplicationKeySettings;
 import com.github.skjolber.desfire.ev1.model.DesfireTag;
-import com.github.skjolber.desfire.ev1.model.command.DefaultIsoDepAdapter;
 import com.github.skjolber.desfire.ev1.model.command.DefaultIsoDepWrapper;
-import com.github.skjolber.desfire.ev1.model.command.IsoDepAdapter;
 import com.github.skjolber.desfire.ev1.model.command.IsoDepWrapper;
 import com.github.skjolber.desfire.ev1.model.file.DesfireFile;
 import com.github.skjolber.desfire.ev1.model.file.DesfireFileCommunicationSettings;
-import com.github.skjolber.desfire.ev1.model.file.RecordDesfireFile;
 import com.github.skjolber.desfire.libfreefare.MifareTag;
 
 import java.io.ByteArrayOutputStream;
@@ -47,8 +42,6 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import de.androidcrypto.WriteCyclicFileBuilder;
-import de.androidcrypto.WriteCyclicFileBuilderBuilder;
 import nfcjlib.core.DESFireAdapter;
 import nfcjlib.core.DESFireEV1;
 import nfcjlib.core.KeyType;
@@ -57,12 +50,12 @@ import nfcjlib.core.util.CRC32;
 import nfcjlib.core.util.TripleDES;
 
 
-public class MainActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback {
+public class MainActivityV2 extends AppCompatActivity implements NfcAdapter.ReaderCallback {
 
     private final String TAG = "Main";
 
     Button btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13, btn14, btn15, btn16, btn17, btn18, btn19, btn20, btn21, btn22, btn23;
-    Button btn24, btn25, btn26, btn27;
+    Button btn24, btn25;
     EditText tagId, dataToWrite, readResult;
     private NfcAdapter mNfcAdapter;
     byte[] tagIdByte;
@@ -152,10 +145,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private byte[] iv;        // the IV, kept updated between operations (for 3K3DES/AES)
     private byte[] skey;      // session key: set on successful authentication
 
-    private byte[] ivOwn;        // the IV, kept updated between operations (for AES)
-    private byte[] skeyOwn;      // session key: set on successful authentication
-
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -188,8 +177,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         btn23 = findViewById(R.id.btn23);
         btn24 = findViewById(R.id.btn24);
         btn25 = findViewById(R.id.btn25);
-        btn26 = findViewById(R.id.btn26);
-        btn27 = findViewById(R.id.btn27);
 
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
@@ -3153,145 +3140,45 @@ but now I can work on reading the AES encrypted file
             }
         });
 
-        btn26.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // try to decrypt an AES encrypted Standard File
-
-                byte[] AES_AID = Utils.hexStringToByteArray("414240");
-                byte applicationMasterKeySettings = (byte) 0x0f; // amks
-                byte[] desKey = new byte[8]; // for the master application
-                byte desKeyNumber0 = (byte) 0; // for the master application
-                byte[] aesKey = new byte[16];
-                byte aesKeyNumberRW = (byte) 0;
-                int aesFileNumberStandard = 1;
-
-
-                // select the master file application
-                byte[] responseData = new byte[2];
-                boolean selectMasterApplicationSuccess = selectApplicationDes(readResult, AID_Master, responseData);
-                writeToUiAppend(readResult, "selectMasterApplication result: " + selectMasterApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
-
-                // authenticate
-                responseData = new byte[2];
-                // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
-                boolean authenticateMasterSuccess = authenticateApplicationDes(readResult, desKeyNumber0, desKey, false, responseData);
-                writeToUiAppend(readResult, "authenticateMasterApplication result: " + authenticateMasterSuccess + " with response: " + Utils.bytesToHex(responseData));
-                if (!authenticateMasterSuccess) {
-                    writeToUiAppend(readResult, "the authenticationMaster was not successful, aborted");
-                    return;
-                }
-
-                // select the application
-                responseData = new byte[2];
-                boolean selectApplicationSuccess = selectApplicationDes(readResult, AES_AID, responseData);
-                writeToUiAppend(readResult, "selectApplication result: " + selectApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
-                if (!selectApplicationSuccess) {
-                    writeToUiAppend(readResult, "the selectApplication was not successful, aborted");
-                    return;
-                }
-
-                // authenticate wit aes key 0
-                responseData = new byte[2];
-                boolean authenticateReadSuccess = authenticateApplicationAes(readResult, aesKeyNumberRW, aesKey, true, responseData);
-                writeToUiAppend(readResult, "authenticateRead result: " + authenticateReadSuccess + " with response: " + Utils.bytesToHex(responseData));
-                if (!authenticateReadSuccess) {
-                    writeToUiAppend(readResult, "the authenticationRead was not successful, aborted");
-                    return;
-                }
-
-                // read the standard file
-                responseData = new byte[2];
-                byte[] readEncryptedData = readFromStandardFile(readResult, (byte) (aesFileNumberStandard & 0xff), responseData);
-                writeToUiAppend(readResult, printData("readEncryptedData", readEncryptedData));
-                writeToUiAppend(readResult, printData("responseData", responseData));
-
-                // working on decryption and CMAC validation using these static data
-                byte[] decSessionKey = Utils.hexStringToByteArray("00000000000000000000000000000000");
-                byte[] decIv = Utils.hexStringToByteArray("00010203681463f60c0d0e0fc3f96400");
-                byte[] decCrypData = Utils.hexStringToByteArray("b2c969b5f64fc6ea5e0cf8cd708f3f774c970aa11e68285d775a2b74167e6348b3dc1d59a109b3cb17c6c3568b65414f9100");
-                // send APDU length: 13 data: 90bd0000070100000020000000
-                byte[] decReadCommandApdu = Utils.hexStringToByteArray("90bd0000070100000020000000");
-
-            }
-        });
-
-        btn27.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // decryption of static data
-                writeToUiAppend(readResult, "");
-                writeToUiAppend(readResult, "Manual decryption of card data");
-
-                // working on decryption and CMAC validation using these static data
-                byte[] decSessionKey = Utils.hexStringToByteArray("00010203681463f60c0d0e0fc3f96400");
-                byte[] decIv = Utils.hexStringToByteArray("00000000000000000000000000000000");
-                byte[] decCryptedDataStatus = Utils.hexStringToByteArray("b2c969b5f64fc6ea5e0cf8cd708f3f774c970aa11e68285d775a2b74167e6348b3dc1d59a109b3cb17c6c3568b65414f9100");
-                byte[] decReadCommandApdu = Utils.hexStringToByteArray("90bd0000070100000020000000"); // 13 byte
-
-                writeToUiAppend(readResult, printData("dec SessionKey", decSessionKey));
-                writeToUiAppend(readResult, printData("dec IV        ", decIv));
-                writeToUiAppend(readResult, printData("dec Cryp Data ", decCryptedDataStatus));
-                writeToUiAppend(readResult, printData("Read Cmd APDU ", decReadCommandApdu));
-                byte[] decCryptedData = Arrays.copyOf(decCryptedDataStatus, decCryptedDataStatus.length - 2);
-                writeToUiAppend(readResult, printData("dec Cryp Data ", decCryptedData));
-                byte[] plaintextCrc = new byte[0];
-                try {
-                    plaintextCrc = decryptAes(decCryptedData, decSessionKey, decIv);
-                } catch (Exception e) {
-                    //throw new RuntimeException(e);
-                    writeToUiAppend(readResult, "Error during decryption: " + e.getMessage());
-                }
-                writeToUiAppend(readResult, printData("plainCrc Data ", plaintextCrc));
-                if (plaintextCrc != null) {
-                    writeToUiAppend(readResult, new String (plaintextCrc, StandardCharsets.UTF_8));
-                }
-
-                // that does not work, the first 16 bytes are scrambled due to wrong IV
-                // �_�~9�uF`M,jqrstuvwx56789012��&�????????????????????????
-                // plainCrc Data  length: 48 data: f80f5fec7e1a391ddd754617604d2c6a71727374757677783536373839303132aad226da000000000000000000000000
-                //           | wrap
-                //             | cmd
-                //                     | file number
-                // full APDU 90bd0000070100000020000000
-                // readCmd     bd        00000000100000
-                // readCmd     bd00000000100000
-                //           0 1 2 3 4 5 6 7 8 9 0 1 2
-                // so we need bytes 1, 6 - 12
-                byte[] commandForCrc = new byte[8];
-                commandForCrc[0] = decReadCommandApdu[1];
-                System.arraycopy(decReadCommandApdu, 6, commandForCrc, 1, 7);
-                writeToUiAppend(readResult, printData("com for CRC", commandForCrc));
-                writeToUiAppend(readResult, "com expectd length 08 data: bd00000020000000");
-                // data is ok by manual view
-
-                // Desfire line 1884: read
-                Cryp cryp = new Cryp(decSessionKey, decIv);
-                // preprocess the read command to get a new iv
-                writeToUiAppend(readResult, printData("skey before preproc", cryp.getSkey()));
-                writeToUiAppend(readResult, printData("IV   before preproc", cryp.getIv()));
-                byte[] apduCommandAfterPreprocessing = cryp.preprocessAes(commandForCrc, 0);
-                // we should have a changed iv
-                writeToUiAppend(readResult, printData("com for CRC", apduCommandAfterPreprocessing));
-                writeToUiAppend(readResult, printData("skey after  preproc", cryp.getSkey()));
-                writeToUiAppend(readResult, printData("IV   after  preproc", cryp.getIv()));
-
-                // decrypt
-                byte[] cryptPlaintext1 = cryp.postprocessEnciphered(decCryptedDataStatus, 32); // full received apdu with status
-                writeToUiAppend(readResult, printData("cryp Plaintext 1 ", cryptPlaintext1));
-                if (cryptPlaintext1 != null) {
-                    writeToUiAppend(readResult, new String (cryptPlaintext1, StandardCharsets.UTF_8));
-                }
-
-
-
-
-
-            }
-        });
 
     }
 
+    // a simplified run
+    private void writeToStandardFile() {
+        String data = dataToWrite.getText().toString();
+        if (TextUtils.isEmpty(data)) {
+            Toast.makeText(getApplicationContext(),
+                    "please enter some data to write on tag",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        /*
+        // select the application
+        byte[] responseData = new byte[2];
+        boolean success = selectApplicationDes(readResult, AID_DesStandard, responseData);
+        writeToUiAppend(readResult, "selectApplication success: " + success + " with response: " + Utils.bytesToHex(responseData));
+
+        // authenticate
+        responseData = new byte[2];
+        // we set the rw + car rights to key 0 and read rights to key1, so we need to authenticate with key 2 (write rights) first to proceed
+        boolean authenticateSuccess = authenticateApplicationDes(readResult, AID_DesStandard_Key2_Number, AID_DesStandard_Key2, false, responseData);
+        writeToUiAppend(readResult, "authenticateApplication result: " + success + " with response: " + Utils.bytesToHex(responseData));
+        if (!authenticateSuccess) {
+            writeToUiAppend(readResult, "the authentication was not successful, aborted");
+            return;
+        }
+*/
+        // write to standard file
+        byte[] responseData = new byte[2];
+        responseData = new byte[2];
+        boolean writeStandardFileSuccess = writeToStandardFile(readResult, DesStandardFileFileNumber1, data.getBytes(StandardCharsets.UTF_8), responseData);
+        writeToUiAppend(readResult, "writeStandardFile result: " + writeStandardFileSuccess + " with response: " + Utils.bytesToHex(responseData));
+        if (!writeStandardFileSuccess) {
+            writeToUiAppend(readResult, "the writeStandardFile was not successful, aborted");
+            return;
+        }
+
+    }
 
     /**
      * start section for ready to use commands
@@ -3630,14 +3517,8 @@ but now I can work on reading the AES encrypted file
                 writeToUiAppend(logTextView, "Authenticated");
 
                 // generate the session key
-                //skey = generateSessionKey(rndA, rndB, KeyType.AES);
-
-
-                // own vars
-                ivOwn = new byte[16]; // AES IV is 16 bytes long
-                skeyOwn = generateSessionKey(rndA, rndB, KeyType.AES);
-                writeToUiAppend(logTextView, printData("## ivOwn ##", ivOwn));
-                writeToUiAppend(logTextView, printData("## session key ##", skeyOwn));
+                skey = generateSessionKey(rndA, rndB, KeyType.AES);
+                writeToUiAppend(logTextView, printData("## session key ##", skey));
                 return true;
             } else {
                 writeToUiAppend(logTextView, "Authentication failed");
