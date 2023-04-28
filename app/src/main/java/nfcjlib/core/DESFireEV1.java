@@ -33,6 +33,7 @@ import com.github.skjolber.desfire.ev1.model.file.ValueDesfireFile;
 import com.github.skjolber.desfire.ev1.model.random.DefaultRandomSource;
 import com.github.skjolber.desfire.ev1.model.random.RandomSource;
 
+import de.androidcrypto.nfcmifaredesfireplayground.PayloadBuilder;
 import nfcjlib.core.util.AES;
 import nfcjlib.core.util.BitOp;
 import nfcjlib.core.util.CMAC;
@@ -1550,6 +1551,10 @@ public class DESFireEV1 {
 			return Arrays.copyOfRange(apdu, 0, apdu.length - 2);
 		}
 
+		// todo HARDCODED ENCIPHERED
+		Log.e(TAG, "In postprocess commSett value is " + commSett.toString());
+		Log.e(TAG, "HARDCODED way from PLAIN_MAC to ENCIPHERED");
+
 		switch (commSett) {
 		case PLAIN:
 			if (ktype == KeyType.DES || ktype == KeyType.TDES)
@@ -1591,7 +1596,10 @@ public class DESFireEV1 {
 			for (int i = 0, j = apdu.length - 10; i < 8 && j < apdu.length - 2; i++, j++) {
 				if (cmac[i] != apdu[j]) {
 					Log.e(TAG, "Received CMAC does not match calculated CMAC.");
-					return null;
+					Log.e(TAG, "HAREDCODED COMMENTED OUT FOR RETURN NULL IN postprocessMaced approx line 1594");
+					// todo HAREDCODED COMMENTED OUT FOR RETURN NULL
+					// IN postprocessEnciphered
+					//return null;
 				}
 			}
 			iv = cmac;
@@ -1625,7 +1633,10 @@ public class DESFireEV1 {
 		for (int i = 0; i < crc.length; i++) {
 			if (crc[i] != plaintext[i + length]) {
 				Log.e(TAG, "Received CMAC does not match calculated CMAC.");
-				return null;
+				Log.e(TAG, "HAREDCODED COMMENTED OUT FOR RETURN NULL IN postprocessEnciphered approx line 1631");
+				// todo HAREDCODED COMMENTED OUT FOR RETURN NULL
+				// IN postprocessEnciphered
+				//return null;
 			}
 		}
 
@@ -1908,7 +1919,10 @@ public class DESFireEV1 {
 		byte[] responseAPDU = adapter.transmitChain(apdu);
 		feedback(apdu, responseAPDU);
 		System.out.println("### Desfire read resp apdu length: " + responseAPDU.length +" data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(responseAPDU));
-		return postprocess(responseAPDU, responseLength, cs); // this seems to be better
+		//return postprocess(responseAPDU, responseLength, cs); // this seems to be better
+		// todo for encrypted use this
+		// todo HARDCODED ENCRYPTION in read, line 1927
+		return postprocess(responseAPDU, responseLength, DesfireFileCommunicationSettings.ENCIPHERED); // this seems to be better
 		//return postprocess(baos.toByteArray(), responseLength, cs); // baos... is empty
 	}
 
@@ -1960,7 +1974,7 @@ public class DESFireEV1 {
 	private boolean write(byte[] payload, byte cmd) throws Exception {
 		System.out.println("### write payload length: " + payload.length + " data: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(payload));
 
-		DesfireFile settings = updateFileSett(payload[0], true); // todo new
+		DesfireFile settings = updateFileSett(payload[0], false); // todo new ORG false
 		System.out.println("### settings: " + settings.toString());
 		DesfireFileCommunicationSettings cs = getFileCommSett(payload[0], true, false, false, true);
 		if (cs == null) {
@@ -1969,7 +1983,7 @@ public class DESFireEV1 {
 			System.out.println("### cs: " + cs.toString());
 		}
 		// rough overwrite
-		//cs = DesfireFileCommunicationSettings.PLAIN;
+		cs = DesfireFileCommunicationSettings.ENCIPHERED; // todo ### HARD CODED VALUE
 
 		if (cs == null) return false;
 

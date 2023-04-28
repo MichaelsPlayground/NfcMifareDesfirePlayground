@@ -62,6 +62,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private final String TAG = "Main";
 
     Button btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13, btn14, btn15, btn16, btn17, btn18, btn19, btn20, btn21, btn22, btn23;
+    Button btn24, btn25;
     EditText tagId, dataToWrite, readResult;
     private NfcAdapter mNfcAdapter;
     byte[] tagIdByte;
@@ -181,6 +182,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         btn21 = findViewById(R.id.btn21);
         btn22 = findViewById(R.id.btn22);
         btn23 = findViewById(R.id.btn23);
+        btn24 = findViewById(R.id.btn24);
+        btn25 = findViewById(R.id.btn25);
 
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
@@ -2411,12 +2414,739 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                 } catch (Exception e) {
                     writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
                 }
-
-
-
-
             }
         });
+
+        btn23.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // this is the DES version with PayloadBuilder
+                // auth with DES keys but unencrypted
+
+                // first we setup a des-key secured application
+                byte[] responseData = new byte[2];
+
+                DESFireEV1 desfire = new DESFireEV1();
+                //desfire.setAdapter(defaultIsoDepAdapter);
+                desfire.setAdapter(desFireAdapter);
+                PayloadBuilder pb = new PayloadBuilder();
+                try {
+
+                    byte[] DES_AID = Utils.hexStringToByteArray("111210");
+                    byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                    byte[] desKey = new byte[8];
+                    byte desKeyNumberRW = (byte) 0;
+                    int desFileNumberStandard = 1;
+                    int desFileNumberStandard32 = 11;
+                    int desFileNumberStandardSize = 32;
+                    int desFileNumberValue = 2;
+                    int desFileNumberLinear = 3;
+                    int desFileLinearSize = 32;
+                    int desFileLinearRecords = 5;
+                    int desFileNumberCyclic = 4;
+                    int desFileCyclicSize = 32;
+                    int desFileCyclicRecords = 5;
+
+
+                    // complete reading
+                    boolean dfSelectM = desfire.selectApplication(AID_Master);
+                    writeToUiAppend(readResult, "dfSelectM result: " + dfSelectM);
+
+                    boolean dfAuthM = desfire.authenticate(desKey, (byte) 0, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthMRead result: " + dfAuthM);
+
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Create application");
+
+                    boolean dfCreateApplication = desfire.createApplication(DES_AID, applicationMasterKeySettings, KeyType.DES, (byte) 3);
+                    writeToUiAppend(readResult, "dfCreateApplication result: " + dfCreateApplication);
+
+                    boolean dfSelectApplication = desfire.selectApplication(DES_AID);
+                    writeToUiAppend(readResult, "dfSelectApplication result: " + dfSelectApplication);
+
+                    boolean dfAuthApplication = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthApplication result: " + dfAuthApplication);
+
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Standard file");
+
+                    byte[] payloadStandardFile = pb.createStandardFile(desFileNumberStandard, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0, desFileNumberStandardSize);
+                    boolean dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
+                    writeToUiAppend(readResult, "dfCreateStandardFile result: " + dfCreateStandardFile);
+
+                    writeToUiAppend(readResult, "create a Standard file with full 32 bte content");
+                    payloadStandardFile = pb.createStandardFile(desFileNumberStandard32, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0, desFileNumberStandardSize);
+                    dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
+                    writeToUiAppend(readResult, "dfCreateStandardFile result: " + dfCreateStandardFile);
+
+                    // auth for writing
+                    boolean dfAuthS1 = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthS1 result: " + dfAuthS1);
+
+                    byte[] payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard, "*** Standard file data ***");
+                    boolean dfWriteStandard = desfire.writeData(payloadWriteStandardData);
+                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
+
+                    // write a full 32 bytes data
+                    writeToUiAppend(readResult, "write Standard file with full 32 bytes content");
+                    String data32String = "12345678901234567890123456789012";
+                    payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard32, data32String);
+                    dfWriteStandard = desfire.writeData(payloadWriteStandardData);
+                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
+
+                    // auth for reading skipped
+
+                    byte[] readStandard = desfire.readData((byte) (desFileNumberStandard & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    } else {
+                        writeToUiAppend(readResult, "no data available");
+                    }
+
+                    writeToUiAppend(readResult, "read Standard file with full 32 bytes content");
+                    readStandard = desfire.readData((byte) (desFileNumberStandard32 & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    } else {
+                        writeToUiAppend(readResult, "no data available");
+                    }
+
+                    // value file
+                    // linear records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Value file");
+
+                    byte[] payloadValueFile = pb.createValueFile(desFileNumberValue, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0,
+                            0, 100, 49);
+                    boolean dfCreateValueFile = desfire.createValueFile(payloadValueFile);
+                    writeToUiAppend(readResult, "dfCreateValueFile result: " + dfCreateValueFile);
+
+                    // read the value
+                    int readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // credit by 11
+                    //byte[] payloadCreditData = pb.creditValueFile(desFileNumberValue, 11);
+                    boolean dfCreditValue = desfire.credit((byte) (desFileNumberValue & 0xff), 11);
+                    writeToUiAppend(readResult, "dfCreditValue result: " + dfCreditValue);
+
+                    // don't forget to commit
+                    boolean dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    // read the value
+                    readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // debit by 7
+                    //byte[] payloadDebitData = pb.debitValueFile(desFileNumberValue, 7);
+                    boolean dfDebitValue = desfire.debit((byte) (desFileNumberValue & 0xff), 7);
+                    writeToUiAppend(readResult, "dfDebitValue result: " + dfDebitValue);
+
+                    // don't forget to commit
+                    dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    // read the value
+                    readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // linear records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Linear Records file");
+
+                    byte[] payloadLinearRecordsFile = pb.createLinearRecordsFile(desFileNumberLinear, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0, desFileLinearSize, desFileLinearRecords);
+                    writeToUiAppend(readResult, printData("payloadLinearRecordsFile", payloadLinearRecordsFile));
+                    boolean dfCreateLinearRecordsFile = desfire.createLinearRecordFile(payloadLinearRecordsFile);
+                    writeToUiAppend(readResult, "dfCreateLinearRecordsFile result: " + dfCreateLinearRecordsFile);
+
+                    // auth for writing
+                    boolean dfAuthL1 = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthL1 result: " + dfAuthL1);
+
+                    try {
+
+                        byte[] payloadWriteLinearData = pb.writeToLinearRecordsFile(desFileNumberLinear, "Entry from " + Utils.getTimestamp());
+                        boolean dfWriteLinear = desfire.writeRecord(payloadWriteLinearData);
+                        writeToUiAppend(readResult, "dfWriteLinear result: " + dfWriteLinear);
+
+                        // don't forget to commit
+                        dfCommit = desfire.commitTransaction();
+                        writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+                    } catch (Exception e) {
+                        writeToUiAppend(readResult, "We received an error during writing the data to the Linear Records file");
+                        writeToUiAppend(readResult, "maybe the file is full; consider to clear the files");
+                        writeToUiAppend(readResult, e.getMessage());
+                    }
+/*
+                    for (int i = 0; i < desFileLinearRecords; i++) {
+                        writeToUiAppend(readResult, "linear records file record number: " + i);
+                        byte[] readLinearRecordsFile = desfire.readRecords((byte) (desFileNumberLinear & 0xff), i, 1); // means from record 0 to 4, reading 1 record per read
+                        writeToUiAppend(readResult, printData("readLinearRecordsFile", readLinearRecordsFile));
+                        if (readStandard != null) {
+                            writeToUiAppend(readResult, new String(readLinearRecordsFile, StandardCharsets.UTF_8));
+                        }
+                    }
+*/
+                    // read complete content
+                    byte[] readLinearRecordsFile = desfire.readRecords((byte) (desFileNumberLinear & 0xff), 0, 0); // means from record 0 to 4, reading 1 record per read
+                    writeToUiAppend(readResult, printData("readLinearRecordsFile", readLinearRecordsFile));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readLinearRecordsFile, StandardCharsets.UTF_8));
+                    }
+
+                    // Cyclic Records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Cyclic Records file");
+
+                    byte[] payloadCyclicRecordsFile = pb.createCyclicRecordsFile(desFileNumberCyclic, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0, desFileCyclicSize, desFileCyclicRecords);
+                    writeToUiAppend(readResult, printData("payloadCyclicRecordsFile", payloadCyclicRecordsFile));
+                    boolean dfCreateCyclicRecordsFile = desfire.createCyclicRecordFile(payloadCyclicRecordsFile);
+                    writeToUiAppend(readResult, "dfCreateCyclicRecordsFile result: " + dfCreateCyclicRecordsFile);
+
+                    // auth for writing
+                    boolean dfAuthC1 = desfire.authenticate(desKey, desKeyNumberRW, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthC1 result: " + dfAuthC1);
+
+                    String dataString = "EntryX from " + Utils.getTimestamp();
+                    byte[] payloadWriteCyclicData = pb.writeToCyclicRecordsFile(desFileNumberCyclic, dataString);
+                    writeToUiAppend(readResult, "dataString length: " + dataString.length() + " data: " + dataString);
+                    boolean dfWriteCyclic = desfire.writeRecord(payloadWriteCyclicData);
+                    writeToUiAppend(readResult, "dfWriteCyclic result: " + dfWriteCyclic);
+
+                    // don't forget to commit
+                    dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    /*
+                    for (int i = 0; i < desFileCyclicRecords; i++) {
+                        writeToUiAppend(readResult, "cyclic records file record number: " + i);
+                        byte[] readCyclicRecordsFile = desfire.readRecords((byte) (desFileNumberCyclic & 0xff), i, 1); // means from record 0 to 4, reading 1 record per read
+                        writeToUiAppend(readResult, printData("readCyclicRecordsFile", readCyclicRecordsFile));
+                        if (readStandard != null) {
+                            writeToUiAppend(readResult, new String(readCyclicRecordsFile, StandardCharsets.UTF_8));
+                        }
+                    }
+                     */
+
+                    // read complete content
+                    byte[] readCyclicRecordsFile = desfire.readRecords((byte) (desFileNumberCyclic & 0xff), 0, 0); // means complete content
+                    writeToUiAppend(readResult, printData("readCyclicRecordsFile", readCyclicRecordsFile));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readCyclicRecordsFile, StandardCharsets.UTF_8));
+                    }
+
+                } catch (IOException e) {
+                    writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
+                } catch (Exception e) {
+                    writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
+                }
+                }
+        });
+
+        btn24.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // this is the AES version with PayloadBuilder
+                // auth with AES keys but unencrypted
+
+                // first we setup a des-key secured application
+                byte[] responseData = new byte[2];
+
+                DESFireEV1 desfire = new DESFireEV1();
+                //desfire.setAdapter(defaultIsoDepAdapter);
+                desfire.setAdapter(desFireAdapter);
+                PayloadBuilder pb = new PayloadBuilder();
+                try {
+
+                    byte[] AES_AID = Utils.hexStringToByteArray("212220");
+                    byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                    byte[] desKey = new byte[8]; // for the master application
+                    byte[] aesKey = new byte[16];
+                    byte desKeyNumberRW = (byte) 0;
+                    int desFileNumberStandard = 1;
+                    int desFileNumberStandard32 = 11;
+                    int desFileNumberStandardSize = 32;
+                    int desFileNumberValue = 2;
+                    int desFileNumberLinear = 3;
+                    int desFileLinearSize = 32;
+                    int desFileLinearRecords = 5;
+                    int desFileNumberCyclic = 4;
+                    int desFileCyclicSize = 32;
+                    int desFileCyclicRecords = 5;
+
+                    // complete reading
+                    boolean dfSelectM = desfire.selectApplication(AID_Master);
+                    writeToUiAppend(readResult, "dfSelectM result: " + dfSelectM);
+
+                    boolean dfAuthM = desfire.authenticate(desKey, (byte) 0, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthMRead result: " + dfAuthM);
+
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Create application");
+
+                    boolean dfCreateApplication = desfire.createApplication(AES_AID, applicationMasterKeySettings, KeyType.AES, (byte) 3);
+                    writeToUiAppend(readResult, "dfCreateApplication result: " + dfCreateApplication);
+
+                    boolean dfSelectApplication = desfire.selectApplication(AES_AID);
+                    writeToUiAppend(readResult, "dfSelectApplication result: " + dfSelectApplication);
+
+                    boolean dfAuthApplication = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthApplication result: " + dfAuthApplication);
+
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Standard file");
+
+                    byte[] payloadStandardFile = pb.createStandardFile(desFileNumberStandard, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0, desFileNumberStandardSize);
+                    boolean dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
+                    writeToUiAppend(readResult, "dfCreateStandardFile result: " + dfCreateStandardFile);
+
+                    writeToUiAppend(readResult, "create a Standard file with full 32 bte content");
+                    payloadStandardFile = pb.createStandardFile(desFileNumberStandard32, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0, desFileNumberStandardSize);
+                    dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
+                    writeToUiAppend(readResult, "dfCreateStandardFile result: " + dfCreateStandardFile);
+
+                    // auth for writing
+                    boolean dfAuthS1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthS1 result: " + dfAuthS1);
+
+                    byte[] payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard, "*** Standard file data ***");
+                    boolean dfWriteStandard = desfire.writeData(payloadWriteStandardData);
+                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
+
+                    // write a full 32 bytes data
+                    writeToUiAppend(readResult, "write Standard file with full 32 bytes content");
+                    String data32String = "12345678901234567890123456789012";
+                    payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard32, data32String);
+                    dfWriteStandard = desfire.writeData(payloadWriteStandardData);
+                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
+
+                    // auth for reading skipped
+
+                    byte[] readStandard = desfire.readData((byte) (desFileNumberStandard & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    } else {
+                        writeToUiAppend(readResult, "no data available");
+                    }
+
+                    writeToUiAppend(readResult, "read Standard file with full 32 bytes content");
+                    readStandard = desfire.readData((byte) (desFileNumberStandard32 & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    } else {
+                        writeToUiAppend(readResult, "no data available");
+                    }
+
+                    // value file
+                    // linear records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Value file");
+
+                    byte[] payloadValueFile = pb.createValueFile(desFileNumberValue, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0,
+                            0, 100, 49);
+                    boolean dfCreateValueFile = desfire.createValueFile(payloadValueFile);
+                    writeToUiAppend(readResult, "dfCreateValueFile result: " + dfCreateValueFile);
+
+                    // read the value
+                    int readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // credit by 11
+                    //byte[] payloadCreditData = pb.creditValueFile(desFileNumberValue, 11);
+                    boolean dfCreditValue = desfire.credit((byte) (desFileNumberValue & 0xff), 11);
+                    writeToUiAppend(readResult, "dfCreditValue result: " + dfCreditValue);
+
+                    // don't forget to commit
+                    boolean dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    // read the value
+                    readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // debit by 7
+                    //byte[] payloadDebitData = pb.debitValueFile(desFileNumberValue, 7);
+                    boolean dfDebitValue = desfire.debit((byte) (desFileNumberValue & 0xff), 7);
+                    writeToUiAppend(readResult, "dfDebitValue result: " + dfDebitValue);
+
+                    // don't forget to commit
+                    dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    // read the value
+                    readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // linear records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Linear Records file");
+
+                    byte[] payloadLinearRecordsFile = pb.createLinearRecordsFile(desFileNumberLinear, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0, desFileLinearSize, desFileLinearRecords);
+                    writeToUiAppend(readResult, printData("payloadLinearRecordsFile", payloadLinearRecordsFile));
+                    boolean dfCreateLinearRecordsFile = desfire.createLinearRecordFile(payloadLinearRecordsFile);
+                    writeToUiAppend(readResult, "dfCreateLinearRecordsFile result: " + dfCreateLinearRecordsFile);
+
+                    // auth for writing
+                    boolean dfAuthL1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthL1 result: " + dfAuthL1);
+
+                    try {
+
+                        byte[] payloadWriteLinearData = pb.writeToLinearRecordsFile(desFileNumberLinear, "Entry from " + Utils.getTimestamp());
+                        boolean dfWriteLinear = desfire.writeRecord(payloadWriteLinearData);
+                        writeToUiAppend(readResult, "dfWriteLinear result: " + dfWriteLinear);
+
+                        // don't forget to commit
+                        dfCommit = desfire.commitTransaction();
+                        writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+                    } catch (Exception e) {
+                        writeToUiAppend(readResult, "We received an error during writing the data to the Linear Records file");
+                        writeToUiAppend(readResult, "maybe the file is full; consider to clear the files");
+                        writeToUiAppend(readResult, e.getMessage());
+                    }
+/*
+                    for (int i = 0; i < desFileLinearRecords; i++) {
+                        writeToUiAppend(readResult, "linear records file record number: " + i);
+                        byte[] readLinearRecordsFile = desfire.readRecords((byte) (desFileNumberLinear & 0xff), i, 1); // means from record 0 to 4, reading 1 record per read
+                        writeToUiAppend(readResult, printData("readLinearRecordsFile", readLinearRecordsFile));
+                        if (readStandard != null) {
+                            writeToUiAppend(readResult, new String(readLinearRecordsFile, StandardCharsets.UTF_8));
+                        }
+                    }
+*/
+                    // read complete content
+                    byte[] readLinearRecordsFile = desfire.readRecords((byte) (desFileNumberLinear & 0xff), 0, 0); // means from record 0 to 4, reading 1 record per read
+                    writeToUiAppend(readResult, printData("readLinearRecordsFile", readLinearRecordsFile));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readLinearRecordsFile, StandardCharsets.UTF_8));
+                    }
+
+                    // Cyclic Records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Cyclic Records file");
+
+                    byte[] payloadCyclicRecordsFile = pb.createCyclicRecordsFile(desFileNumberCyclic, PayloadBuilder.CommunicationSetting.Plain,
+                            0, 0, 0, 0, desFileCyclicSize, desFileCyclicRecords);
+                    writeToUiAppend(readResult, printData("payloadCyclicRecordsFile", payloadCyclicRecordsFile));
+                    boolean dfCreateCyclicRecordsFile = desfire.createCyclicRecordFile(payloadCyclicRecordsFile);
+                    writeToUiAppend(readResult, "dfCreateCyclicRecordsFile result: " + dfCreateCyclicRecordsFile);
+
+                    // auth for writing
+                    boolean dfAuthC1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthC1 result: " + dfAuthC1);
+
+                    String dataString = "EntryX from " + Utils.getTimestamp();
+                    byte[] payloadWriteCyclicData = pb.writeToCyclicRecordsFile(desFileNumberCyclic, dataString);
+                    writeToUiAppend(readResult, "dataString length: " + dataString.length() + " data: " + dataString);
+                    boolean dfWriteCyclic = desfire.writeRecord(payloadWriteCyclicData);
+                    writeToUiAppend(readResult, "dfWriteCyclic result: " + dfWriteCyclic);
+
+                    // don't forget to commit
+                    dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    /*
+                    for (int i = 0; i < desFileCyclicRecords; i++) {
+                        writeToUiAppend(readResult, "cyclic records file record number: " + i);
+                        byte[] readCyclicRecordsFile = desfire.readRecords((byte) (desFileNumberCyclic & 0xff), i, 1); // means from record 0 to 4, reading 1 record per read
+                        writeToUiAppend(readResult, printData("readCyclicRecordsFile", readCyclicRecordsFile));
+                        if (readStandard != null) {
+                            writeToUiAppend(readResult, new String(readCyclicRecordsFile, StandardCharsets.UTF_8));
+                        }
+                    }
+                     */
+
+                    // read complete content
+                    byte[] readCyclicRecordsFile = desfire.readRecords((byte) (desFileNumberCyclic & 0xff), 0, 0); // means complete content
+                    writeToUiAppend(readResult, printData("readCyclicRecordsFile", readCyclicRecordsFile));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readCyclicRecordsFile, StandardCharsets.UTF_8));
+                    }
+
+                } catch (IOException e) {
+                    writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
+                } catch (Exception e) {
+                    writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
+                }
+            }
+        });
+
+        btn25.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // this is the AES version with PayloadBuilder
+                // auth with AES keys AND encrypted
+
+                // first we setup a des-key secured application
+                byte[] responseData = new byte[2];
+
+                DESFireEV1 desfire = new DESFireEV1();
+                //desfire.setAdapter(defaultIsoDepAdapter);
+                desfire.setAdapter(desFireAdapter);
+                PayloadBuilder pb = new PayloadBuilder();
+                try {
+
+                    byte[] AES_AID = Utils.hexStringToByteArray("414240");
+                    byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                    byte[] desKey = new byte[8]; // for the master application
+                    byte[] aesKey = new byte[16];
+                    byte desKeyNumberRW = (byte) 0;
+                    int desFileNumberStandard = 1;
+                    int desFileNumberStandard32 = 11;
+                    int desFileNumberStandardSize = 32;
+                    int desFileNumberValue = 2;
+                    int desFileNumberLinear = 3;
+                    int desFileLinearSize = 32;
+                    int desFileLinearRecords = 5;
+                    int desFileNumberCyclic = 4;
+                    int desFileCyclicSize = 32;
+                    int desFileCyclicRecords = 5;
+
+                    // complete reading
+                    boolean dfSelectM = desfire.selectApplication(AID_Master);
+                    writeToUiAppend(readResult, "dfSelectM result: " + dfSelectM);
+
+                    boolean dfAuthM = desfire.authenticate(desKey, (byte) 0, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthMRead result: " + dfAuthM);
+
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Create application");
+
+                    boolean dfCreateApplication = desfire.createApplication(AES_AID, applicationMasterKeySettings, KeyType.AES, (byte) 3);
+                    writeToUiAppend(readResult, "dfCreateApplication result: " + dfCreateApplication);
+
+                    boolean dfSelectApplication = desfire.selectApplication(AES_AID);
+                    writeToUiAppend(readResult, "dfSelectApplication result: " + dfSelectApplication);
+
+                    boolean dfAuthApplication = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthApplication result: " + dfAuthApplication);
+
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Standard file");
+
+                    byte[] payloadStandardFile = pb.createStandardFile(desFileNumberStandard, PayloadBuilder.CommunicationSetting.Encrypted,
+                            0, 0, 0, 0, desFileNumberStandardSize);
+                    boolean dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
+                    writeToUiAppend(readResult, "dfCreateStandardFile result: " + dfCreateStandardFile);
+/*
+MACed seems not to work
+                    writeToUiAppend(readResult, "create a Standard file with full 32 bte content");
+                    byte[]  payloadStandardFile32 = pb.createStandardFile(desFileNumberStandard32, PayloadBuilder.CommunicationSetting.MACed,
+                            0, 0, 0, 0, desFileNumberStandardSize);
+                    boolean dfCreateStandardFile32 = desfire.createStdDataFile(payloadStandardFile32);
+                    writeToUiAppend(readResult, "dfCreateStandardFile32 result: " + dfCreateStandardFile32);
+*/
+
+                    // auth for writing
+                    boolean dfAuthS1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthS1 result: " + dfAuthS1);
+
+                    String dataStandardString = "*** Standard file data ***";
+                    String dataStandard24String =  "abcdefghijklmnopqrstuvwx";
+                    String dataStandard24String2 = "123456789012345678901234";
+                    //String dataStandard32String = "12345678901234567890123456789012";
+                    byte[] payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard, dataStandard24String);
+                    boolean dfWriteStandard = desfire.writeData(payloadWriteStandardData);
+                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
+/*
+                    // write a full 32 bytes data
+                    writeToUiAppend(readResult, "write Standard file with full 32 bytes content");
+                    String data32String = "12345678901234567890123456789012";
+                    payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard32, data32String);
+                    dfWriteStandard = desfire.writeData(payloadWriteStandardData);
+                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
+*/
+                    // auth for reading skipped
+
+                    byte[] readStandard = desfire.readData((byte) (desFileNumberStandard & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    } else {
+                        writeToUiAppend(readResult, "no data available");
+                    }
+
+/*
+Actual app status:
+In DESFireEV1 some read & write methods have hardcoded ENCIPHERED flags instead of Plain/MACed or ENCIPHERED
+second: the calculated CMAC does not match the expected one
+but now I can work on reading the AES encrypted file
+
+
+ */
+
+
+
+/*
+                    writeToUiAppend(readResult, "read Standard file with full 32 bytes content");
+                    readStandard = desfire.readData((byte) (desFileNumberStandard32 & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    } else {
+                        writeToUiAppend(readResult, "no data available");
+                    }
+*/
+/*
+                    // value file
+                    // linear records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Value file");
+
+                    byte[] payloadValueFile = pb.createValueFile(desFileNumberValue, PayloadBuilder.CommunicationSetting.Encrypted,
+                            0, 0, 0, 0,
+                            0, 100, 49);
+                    boolean dfCreateValueFile = desfire.createValueFile(payloadValueFile);
+                    writeToUiAppend(readResult, "dfCreateValueFile result: " + dfCreateValueFile);
+
+                    // read the value
+                    int readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // credit by 11
+                    //byte[] payloadCreditData = pb.creditValueFile(desFileNumberValue, 11);
+                    boolean dfCreditValue = desfire.credit((byte) (desFileNumberValue & 0xff), 11);
+                    writeToUiAppend(readResult, "dfCreditValue result: " + dfCreditValue);
+
+                    // don't forget to commit
+                    boolean dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    // read the value
+                    readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // debit by 7
+                    //byte[] payloadDebitData = pb.debitValueFile(desFileNumberValue, 7);
+                    boolean dfDebitValue = desfire.debit((byte) (desFileNumberValue & 0xff), 7);
+                    writeToUiAppend(readResult, "dfDebitValue result: " + dfDebitValue);
+
+                    // don't forget to commit
+                    dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    // read the value
+                    readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // linear records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Linear Records file");
+
+                    byte[] payloadLinearRecordsFile = pb.createLinearRecordsFile(desFileNumberLinear, PayloadBuilder.CommunicationSetting.Encrypted,
+                            0, 0, 0, 0, desFileLinearSize, desFileLinearRecords);
+                    writeToUiAppend(readResult, printData("payloadLinearRecordsFile", payloadLinearRecordsFile));
+                    boolean dfCreateLinearRecordsFile = desfire.createLinearRecordFile(payloadLinearRecordsFile);
+                    writeToUiAppend(readResult, "dfCreateLinearRecordsFile result: " + dfCreateLinearRecordsFile);
+
+                    // auth for writing
+                    boolean dfAuthL1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthL1 result: " + dfAuthL1);
+
+                    try {
+
+                        byte[] payloadWriteLinearData = pb.writeToLinearRecordsFile(desFileNumberLinear, "Entry from " + Utils.getTimestamp());
+                        boolean dfWriteLinear = desfire.writeRecord(payloadWriteLinearData);
+                        writeToUiAppend(readResult, "dfWriteLinear result: " + dfWriteLinear);
+
+                        // don't forget to commit
+                        dfCommit = desfire.commitTransaction();
+                        writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+                    } catch (Exception e) {
+                        writeToUiAppend(readResult, "We received an error during writing the data to the Linear Records file");
+                        writeToUiAppend(readResult, "maybe the file is full; consider to clear the files");
+                        writeToUiAppend(readResult, e.getMessage());
+                    }
+
+ */
+/*
+                    for (int i = 0; i < desFileLinearRecords; i++) {
+                        writeToUiAppend(readResult, "linear records file record number: " + i);
+                        byte[] readLinearRecordsFile = desfire.readRecords((byte) (desFileNumberLinear & 0xff), i, 1); // means from record 0 to 4, reading 1 record per read
+                        writeToUiAppend(readResult, printData("readLinearRecordsFile", readLinearRecordsFile));
+                        if (readStandard != null) {
+                            writeToUiAppend(readResult, new String(readLinearRecordsFile, StandardCharsets.UTF_8));
+                        }
+                    }
+*/
+                    /*
+                    // read complete content
+                    byte[] readLinearRecordsFile = desfire.readRecords((byte) (desFileNumberLinear & 0xff), 0, 0); // means from record 0 to 4, reading 1 record per read
+                    writeToUiAppend(readResult, printData("readLinearRecordsFile", readLinearRecordsFile));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readLinearRecordsFile, StandardCharsets.UTF_8));
+                    }
+
+                    // Cyclic Records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Cyclic Records file");
+
+                    byte[] payloadCyclicRecordsFile = pb.createCyclicRecordsFile(desFileNumberCyclic, PayloadBuilder.CommunicationSetting.Encrypted,
+                            0, 0, 0, 0, desFileCyclicSize, desFileCyclicRecords);
+                    writeToUiAppend(readResult, printData("payloadCyclicRecordsFile", payloadCyclicRecordsFile));
+                    boolean dfCreateCyclicRecordsFile = desfire.createCyclicRecordFile(payloadCyclicRecordsFile);
+                    writeToUiAppend(readResult, "dfCreateCyclicRecordsFile result: " + dfCreateCyclicRecordsFile);
+
+                    // auth for writing
+                    boolean dfAuthC1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthC1 result: " + dfAuthC1);
+
+                    String dataString = "EntryX from " + Utils.getTimestamp();
+                    byte[] payloadWriteCyclicData = pb.writeToCyclicRecordsFile(desFileNumberCyclic, dataString);
+                    writeToUiAppend(readResult, "dataString length: " + dataString.length() + " data: " + dataString);
+                    boolean dfWriteCyclic = desfire.writeRecord(payloadWriteCyclicData);
+                    writeToUiAppend(readResult, "dfWriteCyclic result: " + dfWriteCyclic);
+
+                    // don't forget to commit
+                    dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+*/
+                    /*
+                    for (int i = 0; i < desFileCyclicRecords; i++) {
+                        writeToUiAppend(readResult, "cyclic records file record number: " + i);
+                        byte[] readCyclicRecordsFile = desfire.readRecords((byte) (desFileNumberCyclic & 0xff), i, 1); // means from record 0 to 4, reading 1 record per read
+                        writeToUiAppend(readResult, printData("readCyclicRecordsFile", readCyclicRecordsFile));
+                        if (readStandard != null) {
+                            writeToUiAppend(readResult, new String(readCyclicRecordsFile, StandardCharsets.UTF_8));
+                        }
+                    }
+                     */
+/*
+                    // read complete content
+                    byte[] readCyclicRecordsFile = desfire.readRecords((byte) (desFileNumberCyclic & 0xff), 0, 0); // means complete content
+                    writeToUiAppend(readResult, printData("readCyclicRecordsFile", readCyclicRecordsFile));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readCyclicRecordsFile, StandardCharsets.UTF_8));
+                    }
+*/
+                } catch (IOException e) {
+                    writeToUiAppend(readResult, "IOEx Error with DESFireEV1 + " + e.getMessage());
+                } catch (Exception e) {
+                    writeToUiAppend(readResult, "Ex Error with DESFireEV1 + " + e.getMessage());
+                }
+            }
+        });
+
 
     }
 
