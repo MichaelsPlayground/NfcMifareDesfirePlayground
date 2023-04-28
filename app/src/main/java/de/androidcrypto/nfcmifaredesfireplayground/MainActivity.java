@@ -3236,8 +3236,10 @@ but now I can work on reading the AES encrypted file
                 byte[] decCryptedData = Arrays.copyOf(decCryptedDataStatus, decCryptedDataStatus.length - 2);
                 writeToUiAppend(readResult, printData("dec Cryp Data ", decCryptedData));
                 byte[] plaintextCrc = new byte[0];
+                byte[] decIvApp = Utils.hexStringToByteArray("8d778afbd8fd4201ce243e017aafc953");
                 try {
-                    plaintextCrc = decryptAes(decCryptedData, decSessionKey, decIv);
+                    //plaintextCrc = decryptAes(decCryptedData, decSessionKey, decIv);
+                    plaintextCrc = decryptAes(decCryptedData, decSessionKey, decIvApp);
                 } catch (Exception e) {
                     //throw new RuntimeException(e);
                     writeToUiAppend(readResult, "Error during decryption: " + e.getMessage());
@@ -3257,6 +3259,7 @@ but now I can work on reading the AES encrypted file
                 // readCmd     bd        00000000100000
                 // readCmd     bd00000000100000
                 //           0 1 2 3 4 5 6 7 8 9 0 1 2
+                //
                 // so we need bytes 1, 6 - 12
                 byte[] commandForCrc = new byte[8];
                 commandForCrc[0] = decReadCommandApdu[1];
@@ -3270,7 +3273,8 @@ but now I can work on reading the AES encrypted file
                 // preprocess the read command to get a new iv
                 writeToUiAppend(readResult, printData("skey before preproc", cryp.getSkey()));
                 writeToUiAppend(readResult, printData("IV   before preproc", cryp.getIv()));
-                byte[] apduCommandAfterPreprocessing = cryp.preprocessAes(commandForCrc, 0);
+                //byte[] apduCommandAfterPreprocessing = cryp.preprocessAes(commandForCrc, 0);
+                byte[] apduCommandAfterPreprocessing = cryp.preprocessPlain(commandForCrc); // the read command is in PLAIN
                 // we should have a changed iv
                 writeToUiAppend(readResult, printData("com for CRC", apduCommandAfterPreprocessing));
                 writeToUiAppend(readResult, printData("skey after  preproc", cryp.getSkey()));

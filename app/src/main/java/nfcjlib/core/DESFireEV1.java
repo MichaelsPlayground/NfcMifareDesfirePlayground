@@ -1461,7 +1461,14 @@ public class DESFireEV1 {
 	// update global IV
 	private byte[] preprocessPlain(byte[] apdu) {
 		if (ktype == KeyType.TKTDES || ktype == KeyType.AES) {
+			System.out.println("*** preprocessPlain ***");
+			System.out.println("*** apdu old: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(apdu));
+			System.out.println("*** IV old:   " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(iv));
+			System.out.println("*** skey old: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(skey));
 			iv = calculateApduCMAC(apdu, skey, iv, ktype);
+			System.out.println("*** apdu new: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(apdu));
+			System.out.println("*** IV new:   " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(iv));
+			System.out.println("*** skey new: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(skey));
 		}
 
 		return apdu;
@@ -1484,7 +1491,6 @@ public class DESFireEV1 {
 		case TKTDES:
 		case AES:
 			iv = calculateApduCMAC(apdu, skey, iv, ktype);
-
 			byte[] ret2 = new byte[apdu.length + 8];
 			System.arraycopy(apdu, 0, ret2, 0, apdu.length);
 			System.arraycopy(iv, 0, ret2, apdu.length - 1, 8);  // trailing 00

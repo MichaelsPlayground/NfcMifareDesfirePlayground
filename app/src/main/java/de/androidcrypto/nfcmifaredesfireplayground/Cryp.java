@@ -8,6 +8,7 @@ import java.util.Arrays;
 
 import nfcjlib.core.KeyType;
 import nfcjlib.core.util.AES;
+import nfcjlib.core.util.CMAC;
 import nfcjlib.core.util.CRC16;
 import nfcjlib.core.util.CRC32;
 import nfcjlib.core.util.TripleDES;
@@ -100,6 +101,13 @@ public class Cryp {
         return preprocessEnciphered(apdu, offset);
     }
 
+    public byte[] preprocessPlain(byte[] apdu) {
+        if (ktype == KeyType.TKTDES || ktype == KeyType.AES) {
+            iv = calculateApduCMAC(apdu, skey, iv, ktype);
+        }
+
+        return apdu;
+    }
 
     // calculate CRC and append, encrypt, and update global IV
     public byte[] preprocessEnciphered(byte[] apdu, int offset) {
@@ -183,6 +191,28 @@ public class Cryp {
         System.arraycopy(crc, 0, plaintext, payloadLen - offset, crc.length);
         System.out.println(printData("# encryptApdu plaintext", plaintext));
         return send(sessionKey, plaintext, type, iv);
+    }
+
+    private static byte[] calculateApduCMAC(byte[] apdu, byte[] sessionKey, byte[] iv, KeyType type) {
+        byte[] block;
+
+        if (apdu.length == 5) {
+            block = new byte[apdu.length - 4];
+        } else {
+            // trailing 00h exists
+            block = new byte[apdu.length - 5];
+            System.arraycopy(apdu, 5, block, 1, apdu.length - 6);
+        }
+        block[0] = apdu[1];
+
+        switch (type) {
+            case TKTDES:
+                return CMAC.get(CMAC.Type.TKTDES, sessionKey, block, iv);
+            case AES:
+                return CMAC.get(CMAC.Type.AES, sessionKey, block, iv);
+            default:
+                return null;
+        }
     }
 
     // uses nfcjLib/util/CRC32.java
