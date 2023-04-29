@@ -2185,7 +2185,6 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                  */
 
 
-
             }
         });
 
@@ -2660,7 +2659,7 @@ communicationSettings=ENCIPHERED, readAccessKey=0, writeAccessKey=0, readWriteAc
                 } catch (Exception e) {
                     writeToUiAppend(readResult, "Error with DESFireEV1 + " + e.getMessage());
                 }
-                }
+            }
         });
 
         btn24.setOnClickListener(new View.OnClickListener() {
@@ -2972,7 +2971,7 @@ MACed seems not to work
                     writeToUiAppend(readResult, "dfAuthS1 result: " + dfAuthS1);
 
                     String dataStandardString = "*** Standard file data ***";
-                    String dataStandard24String =  "abcdefghijklmnopqrstuvwx";
+                    String dataStandard24String = "abcdefghijklmnopqrstuvwx";
                     String dataStandard24String2 = "123456789012345678901234";
                     //String dataStandard32String = "12345678901234567890123456789012";
                     byte[] payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard, dataStandard24String);
@@ -3263,7 +3262,7 @@ but now I can work on reading the AES encrypted file
                 }
                 writeToUiAppend(readResult, printData("plainCrc Data ", plaintextCrc));
                 if (plaintextCrc != null) {
-                    writeToUiAppend(readResult, new String (plaintextCrc, StandardCharsets.UTF_8));
+                    writeToUiAppend(readResult, new String(plaintextCrc, StandardCharsets.UTF_8));
                 }
 
                 // that does not work, the first 16 bytes are scrambled due to wrong IV
@@ -3302,7 +3301,7 @@ but now I can work on reading the AES encrypted file
                 byte[] cryptPlaintext1 = cryp.postprocessEnciphered(decCryptedDataStatus, 32); // full received apdu with status
                 writeToUiAppend(readResult, printData("cryp Plaintext 1 ", cryptPlaintext1));
                 if (cryptPlaintext1 != null) {
-                    writeToUiAppend(readResult, new String (cryptPlaintext1, StandardCharsets.UTF_8));
+                    writeToUiAppend(readResult, new String(cryptPlaintext1, StandardCharsets.UTF_8));
                 }
             }
         });
@@ -3371,7 +3370,7 @@ but now I can work on reading the AES encrypted file
                 responseData = new byte[2];
                 // we need to know how long this Standard File is
                 //byte[] data = "6655443322".getBytes(StandardCharsets.UTF_8);
-                byte[] dataStandard24 =  "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8);
+                byte[] dataStandard24 = "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8);
                 byte[] dataStandard32 = "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8);
                 byte[] dataStandard28 = "1234567890123456789012345678".getBytes(StandardCharsets.UTF_8);
                 boolean writeEncryptedDataSuccess = writeToStandardFileAes(readResult, (byte) (aesFileNumberStandard & 0xff), dataStandard28, responseData, cryp);
@@ -3401,7 +3400,6 @@ but now I can work on reading the AES encrypted file
                 byte[] decReadCommandApdu = Utils.hexStringToByteArray("90bd0000070100000020000000");
 
 */
-
 
 
             }
@@ -3551,7 +3549,7 @@ but now I can work on reading the AES encrypted file
                 responseData = new byte[2];
                 // we need to know how long this Cyclic File is
                 //byte[] data = "6655443322".getBytes(StandardCharsets.UTF_8);
-                byte[] dataStandard24 =  "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8);
+                byte[] dataStandard24 = "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8);
                 byte[] dataStandard32 = "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8);
                 byte[] dataStandard28 = "1234567890123456789012345678".getBytes(StandardCharsets.UTF_8);
                 boolean writeEncryptedDataSuccess = writeToCyclicFileAes(readResult, aesFileNumberCyclic, dataStandard28, responseData, cryp);
@@ -3678,7 +3676,7 @@ but now I can work on reading the AES encrypted file
                 // read the cyclic file
                 responseData = new byte[2];
                 // we need to know how long this Standard File is
-                byte[] readEncryptedData = readFromCyclicFileAes(readResult, (byte) (aesFileNumberCyclic & 0xff), responseData, cryp, aesFileNumberCyclicSize);
+                byte[] readEncryptedData = readFromCyclicFileAes(readResult, aesFileNumberCyclic, 0, 5, aesFileNumberCyclicSize, responseData, cryp);
 
                 // update the IV
                 ivOwn = cryp.getIv();
@@ -3713,8 +3711,8 @@ but now I can work on reading the AES encrypted file
      *              24 bytes for 3K3DES)
      * @param keyNo the key number
      * @param type  the cipher
-     * @throws IOException
      * @return true for success
+     * @throws IOException
      */
     public boolean authenticate(byte[] key, byte keyNo, KeyType type) throws IOException {
         if (!validateKey(key, type)) {
@@ -5230,7 +5228,7 @@ writeFileResponse length: 2 data: 917e length error
         byte[] wrapApdu;
         try {
             wrapApdu = wrapMessage(commitCommand, null);
-            byte [] wrapApduAes = cryp.preprocess(wrapApdu, 0, DesfireFileCommunicationSettings.ENCIPHERED); // this will update the iv
+            byte[] wrapApduAes = cryp.preprocess(wrapApdu, 0, DesfireFileCommunicationSettings.ENCIPHERED); // this will update the iv
             commitResponse = isoDep.transceive(wrapApduAes);
         } catch (Exception e) {
             //throw new RuntimeException(e);
@@ -5293,20 +5291,81 @@ writeFileResponse length: 2 data: 917e length error
         return readFileResponse;
     }
 
-    private byte[] readFromCyclicFileAes(TextView logTextView, byte fileNumber, byte[] response, Cryp cryp, int lengthInt) {
+    private byte[] readFromCyclicFileAes(TextView logTextView, int fileNumber, int recordToRead, int numberOfRecordsToRead, int recordSize, byte[] response, Cryp cryp) {
+        // we read from a cyclic file within the selected application
+        // this is manual doing at the moment
+        byte readFileCommand = (byte) 0xbb;
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] readFileParameters = pb.readFromCyclicRecordsFile(fileNumber, recordToRead, numberOfRecordsToRead);
+        writeToUiAppend(logTextView, printData("readFileParameters", readFileParameters));
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        boolean moreData = false;
+        byte[] readFileResponse = new byte[0];
+        byte[] wrappedApdu;
+        // this is the first reading
+        try {
+            wrappedApdu = wrapMessage(readFileCommand, readFileParameters);
+            writeToUiAppend(logTextView, printData("send APDU", wrappedApdu));
+            readFileResponse = isoDep.transceive(wrappedApdu);
+            moreData = checkResponseMoreData(readFileResponse); // response = 0x91af
+            if (moreData) {
+                // add the response without trailing response
+                byte[] resp = Arrays.copyOf(readFileResponse, readFileResponse.length - 2);
+                baos.write(resp, 0, resp.length);
+            } else {
+                baos.write(readFileResponse, 0, readFileResponse.length);
+            }
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
+            return null;
+        }
+        writeToUiAppend(logTextView, printData("readFileResponse1", readFileResponse));
+        System.arraycopy(returnStatusBytes(readFileResponse), 0, response, 0, 2);
+        //byte[] responseWithoutStatus = Arrays.copyOf(readStandardFileResponse, readStandardFileResponse.length - 2);
+
+        // first we need to update the IV with the apduCommand
+        cryp.preprocessPlain(wrappedApdu);
+
+        if ((!moreData) && (!checkResponse(readFileResponse))) return null;
+
+        // read more data
+        while (moreData) {
+            try {
+                byte moreDataCommand = (byte) 0xaf;
+                wrappedApdu = wrapMessage(moreDataCommand, null);
+                byte[] respFull = isoDep.transceive(wrappedApdu);
+                writeToUiAppend(logTextView, printData("send APDU", wrappedApdu));
+                writeToUiAppend(logTextView, printData("readFileResponse", respFull));
+                if (checkResponseMoreData(respFull)) {
+                    // add the response without trailing response
+                    byte[] resp = Arrays.copyOf(respFull, respFull.length - 2);
+                    baos.write(resp, 0, resp.length);
+                } else {
+                    baos.write(respFull, 0, respFull.length);
+                    moreData = false;
+                }
+            } catch (Exception e) {
+                //throw new RuntimeException(e);
+                writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
+            }
+        }
+
+        byte[] responseFull = baos.toByteArray();
+        writeToUiAppend(logTextView, printData("responseFull", responseFull));
+        byte[] decryptedResponse = cryp.postprocessEnciphered(responseFull, ((numberOfRecordsToRead * recordSize)));
+        writeToUiAppend(logTextView, printData("decryptedResponse", decryptedResponse));
+        if (decryptedResponse == null) System.arraycopy(new byte[2], 0, response, 0, 2);
+        return decryptedResponse;
+    }
+
+    private byte[] readFromCyclicFileAesManual(TextView logTextView, int fileNumber, int recordToRead, int numberOfRecordsToRead, int recordSize, byte[] response, Cryp cryp) {
         // we read from a cyclic file within the selected application
 
         // this is manual doing at the moment
         byte readFileCommand = (byte) 0xbb;
-
-        byte[] offset = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00};
-        byte[] recordNumber = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // 00 is the youngest, 04 is the oldest entry
-        byte[] numberOfRecords = new byte[]{(byte) 0x05, (byte) 0x00, (byte) 0x00}; // 05 is the maximum
-
-        byte[] readFileParameters = new byte[7];
-        readFileParameters[0] = fileNumber;
-        System.arraycopy(recordNumber, 0, readFileParameters, 1, 3);
-        System.arraycopy(numberOfRecords, 0, readFileParameters, 4, 3);
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] readFileParameters = pb.readFromCyclicRecordsFile(fileNumber, recordToRead, numberOfRecordsToRead);
         writeToUiAppend(logTextView, printData("readFileParameters", readFileParameters));
 
         byte[] readFileResponse = new byte[0];
@@ -5351,7 +5410,7 @@ writeFileResponse length: 2 data: 917e length error
 
         }
         // concat the responses
-        int completeResponseLength = responseWithoutStatus1.length +  responseWithoutStatus2.length + responseWithoutStatus3.length;
+        int completeResponseLength = responseWithoutStatus1.length + responseWithoutStatus2.length + responseWithoutStatus3.length;
         writeToUiAppend(logTextView, "completeResponseLength: " + completeResponseLength);
         byte[] readFileResponseComplete = new byte[completeResponseLength];
         System.arraycopy(responseWithoutStatus1, 0, readFileResponseComplete, 0, responseWithoutStatus1.length);
@@ -5363,13 +5422,14 @@ writeFileResponse length: 2 data: 917e length error
         try {
             byte[] decManual = decryptAes(readFileResponseComplete, skeyOwn, cryp.getIv());
             writeToUiAppend(logTextView, printData("manualDecryption", decManual));
-            if (decManual != null) writeToUiAppend(logTextView, new String(decManual, StandardCharsets.UTF_8));
+            if (decManual != null)
+                writeToUiAppend(logTextView, new String(decManual, StandardCharsets.UTF_8));
         } catch (Exception e) {
             writeToUiAppend(logTextView, "error on manual decryption + " + e.getMessage());
         }
 
         // this is by leaving the last 9100 at the end
-        int completeResponseLength2 = responseWithoutStatus1.length +  responseWithoutStatus2.length + responseWithStatus3.length;
+        int completeResponseLength2 = responseWithoutStatus1.length + responseWithoutStatus2.length + responseWithStatus3.length;
         writeToUiAppend(logTextView, "completeResponseLength2: " + completeResponseLength2);
         byte[] readFileResponseComplete2 = new byte[completeResponseLength2];
         System.arraycopy(responseWithoutStatus1, 0, readFileResponseComplete2, 0, responseWithoutStatus1.length);
@@ -5377,16 +5437,14 @@ writeFileResponse length: 2 data: 917e length error
         System.arraycopy(responseWithStatus3, 0, readFileResponseComplete2, (responseWithoutStatus1.length + responseWithoutStatus2.length), responseWithStatus3.length);
         writeToUiAppend(logTextView, printData("readFileResponseComplete2", readFileResponseComplete2));
 
-
-
-        byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponseComplete2, (readFileResponseComplete2.length-6)); // takes the complete response
+        //byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponseComplete2, (readFileResponseComplete2.length-6)); // takes the complete response
+        byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponseComplete2, ((numberOfRecordsToRead * recordSize))); // takes the complete response
         // now we can decrypt the received data
         //byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponse, lengthInt); // takes the complete response
         writeToUiAppend(logTextView, printData("decryptedResponse", decryptedResponse));
         if (decryptedResponse == null) System.arraycopy(new byte[2], 0, response, 0, 2);
         return decryptedResponse;
     }
-
 
     private boolean clearRecordFile(TextView logTextView, byte fileNumber, byte[] response) {
         // clear the CyclicFile

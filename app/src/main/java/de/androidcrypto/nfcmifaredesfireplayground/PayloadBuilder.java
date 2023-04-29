@@ -242,6 +242,23 @@ public class PayloadBuilder {
         return payload;
     }
 
+    public byte[] readFromCyclicRecordsFile(int fileNumber, int recordNumberToRead, int numberOfRecords) {
+        // sanity checks
+        if ((fileNumber < 0) || (fileNumber > 15)) return null;
+        if ((recordNumberToRead < 0) || (recordNumberToRead > 15)) return null;
+        if ((numberOfRecords < 1) || (numberOfRecords > 15)) return null;
+        if (recordNumberToRead >= numberOfRecords) return null;
+
+        // build
+        byte[] payload = new byte[7];
+        byte[] recordNumber = intTo3ByteArrayLsb(recordNumberToRead);
+        byte[] numberOfRecordsByte = intTo3ByteArrayLsb(numberOfRecords);
+        payload[0] = (byte) (fileNumber & 0xff); // fileNumber
+        System.arraycopy(recordNumber, 0, payload, 1, 3);
+        System.arraycopy(numberOfRecordsByte, 0, payload, 4, 3);
+        return payload;
+    }
+
     public enum CommunicationSetting{
         Plain, MACed, Encrypted
     }
