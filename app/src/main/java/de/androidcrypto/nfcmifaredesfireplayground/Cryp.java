@@ -43,6 +43,8 @@ public class Cryp {
      * NOTE: only the AES parts are active, all other modes are commented out - DO NOT USE THEM HERE
      */
 
+    // https://stackoverflow.com/questions/20503060/how-to-decrypt-the-first-message-sent-from-mifare-desfire-ev1/20504667#20504667
+
     // encryption code (preprocessing)
     // preprocessing see line 1514: private byte[] preprocessEnciphered(byte[] apdu, int offset) {
     // for encryption of send apdu see line 1767: private static byte[] encryptApdu(byte[] apdu, int offset, byte[] sessionKey, byte[] iv, DesfireKeyType type) {

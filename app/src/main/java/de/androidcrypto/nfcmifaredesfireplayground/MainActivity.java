@@ -62,7 +62,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private final String TAG = "Main";
 
     Button btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13, btn14, btn15, btn16, btn17, btn18, btn19, btn20, btn21, btn22, btn23;
-    Button btn24, btn25, btn26, btn27, btn28, btn29;
+    Button btn24, btn25, btn26, btn27, btn28, btn29, btn32, btn33; // missing 30 + 31 for value files
     EditText tagId, dataToWrite, readResult;
     private NfcAdapter mNfcAdapter;
     byte[] tagIdByte;
@@ -192,6 +192,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         btn27 = findViewById(R.id.btn27);
         btn28 = findViewById(R.id.btn28);
         btn29 = findViewById(R.id.btn29);
+
+        btn32 = findViewById(R.id.btn32);
+        btn33 = findViewById(R.id.btn33);
 
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
@@ -3316,6 +3319,8 @@ but now I can work on reading the AES encrypted file
                 byte aesKeyNumberRW = (byte) 0;
                 int aesFileNumberStandard = 4; // this is file no 04 = self written encrypted data
                 int aesFileNumberStandardSize = 32;
+                // do not extend the fileSize larger than 28 on AES encrypted data or you need to chunk the sending of data
+
 
                 // select the master file application
                 byte[] responseData = new byte[2];
@@ -3367,7 +3372,9 @@ but now I can work on reading the AES encrypted file
                 // we need to know how long this Standard File is
                 //byte[] data = "6655443322".getBytes(StandardCharsets.UTF_8);
                 byte[] dataStandard24 =  "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8);
-                boolean writeEncryptedDataSuccess = writeToStandardFileAes(readResult, (byte) (aesFileNumberStandard & 0xff), dataStandard24, responseData, cryp);
+                byte[] dataStandard32 = "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8);
+                byte[] dataStandard28 = "1234567890123456789012345678".getBytes(StandardCharsets.UTF_8);
+                boolean writeEncryptedDataSuccess = writeToStandardFileAes(readResult, (byte) (aesFileNumberStandard & 0xff), dataStandard28, responseData, cryp);
                 writeToUiAppend(readResult, "writeEncryptedData result: " + writeEncryptedDataSuccess + " with response: " + Utils.bytesToHex(responseData));
                 if (!writeEncryptedDataSuccess) {
                     writeToUiAppend(readResult, "the writeEncryptedData was not successful, aborted");
@@ -3399,6 +3406,294 @@ but now I can work on reading the AES encrypted file
 
             }
         });
+
+        btn29.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // read an  AES encrypted to Standard file written by btn28
+                byte[] AES_AID = Utils.hexStringToByteArray("414240");
+                byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                byte[] desKey = new byte[8]; // for the master application
+                byte desKeyNumber0 = (byte) 0; // for the master application
+                byte[] aesKey = new byte[16];
+                byte aesKeyNumberRW = (byte) 0;
+                int aesFileNumberStandard = 4; // this is file no 04 = self written encrypted data
+                int aesFileNumberStandardSize = 32;
+
+                // select the master file application
+                byte[] responseData = new byte[2];
+                boolean selectMasterApplicationSuccess = selectApplicationDes(readResult, AID_Master, responseData);
+                writeToUiAppend(readResult, "selectMasterApplication result: " + selectMasterApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+
+                // authenticate
+                responseData = new byte[2];
+                // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
+                boolean authenticateMasterSuccess = authenticateApplicationDes(readResult, desKeyNumber0, desKey, false, responseData);
+                writeToUiAppend(readResult, "authenticateMasterApplication result: " + authenticateMasterSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateMasterSuccess) {
+                    writeToUiAppend(readResult, "the authenticationMaster was not successful, aborted");
+                    return;
+                }
+
+                // select the application
+                responseData = new byte[2];
+                boolean selectApplicationSuccess = selectApplicationDes(readResult, AES_AID, responseData);
+                writeToUiAppend(readResult, "selectApplication result: " + selectApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!selectApplicationSuccess) {
+                    writeToUiAppend(readResult, "the selectApplication was not successful, aborted");
+                    return;
+                }
+/*
+                // create the standard file
+                responseData = new byte[2];
+                boolean createStandardFileAesSuccess = createStandardFileAes(readResult, (byte) (aesFileNumberStandard & 0xff), responseData);
+                writeToUiAppend(readResult, "createStandardFileAes result: " + createStandardFileAesSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!createStandardFileAesSuccess) {
+                    writeToUiAppend(readResult, "the createStandardFileAes was not successful, aborted");
+                    return;
+                }
+*/
+                // authenticate wit aes key 0
+                responseData = new byte[2];
+                boolean authenticateWriteSuccess = authenticateApplicationAes(readResult, aesKeyNumberRW, aesKey, true, responseData);
+                writeToUiAppend(readResult, "authenticateWrite result: " + authenticateWriteSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateWriteSuccess) {
+                    writeToUiAppend(readResult, "the authenticationWrite was not successful, aborted");
+                    return;
+                }
+
+                // we do need the Cryp unit
+                Cryp cryp = new Cryp(skeyOwn, ivOwn);
+
+                // read from the standard file
+
+                // read the standard file
+                responseData = new byte[2];
+                // we need to know how long this Standard File is
+                byte[] readEncryptedData = readFromStandardFileAes(readResult, (byte) (aesFileNumberStandard & 0xff), responseData, cryp, aesFileNumberStandardSize);
+
+                // update the IV
+                ivOwn = cryp.getIv();
+
+                writeToUiAppend(readResult, printData("readEncryptedData", readEncryptedData));
+                writeToUiAppend(readResult, printData("responseData", responseData));
+                if (readEncryptedData != null) {
+                    writeToUiAppend(readResult, new String(readEncryptedData, StandardCharsets.UTF_8));
+                } else {
+                    writeToUiAppend(readResult, "no data available");
+                }
+
+            }
+        });
+
+        btn32.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // write AES encrypted to Cyclic file
+                byte[] AES_AID = Utils.hexStringToByteArray("414240");
+                byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                byte[] desKey = new byte[8]; // for the master application
+                byte desKeyNumber0 = (byte) 0; // for the master application
+                byte[] aesKey = new byte[16];
+                byte aesKeyNumberRW = (byte) 0;
+                int aesFileNumberCyclic = 5;
+                int aesFileNumberCyclicSize = 28;
+                // do not extend the fileSize larger than 28 on AES encrypted data or you need to chunk the sending of data
+
+                // select the master file application
+                byte[] responseData = new byte[2];
+                boolean selectMasterApplicationSuccess = selectApplicationDes(readResult, AID_Master, responseData);
+                writeToUiAppend(readResult, "selectMasterApplication result: " + selectMasterApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+
+                // authenticate
+                responseData = new byte[2];
+                // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
+                boolean authenticateMasterSuccess = authenticateApplicationDes(readResult, desKeyNumber0, desKey, false, responseData);
+                writeToUiAppend(readResult, "authenticateMasterApplication result: " + authenticateMasterSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateMasterSuccess) {
+                    writeToUiAppend(readResult, "the authenticationMaster was not successful, aborted");
+                    return;
+                }
+
+                // select the application
+                responseData = new byte[2];
+                boolean selectApplicationSuccess = selectApplicationDes(readResult, AES_AID, responseData);
+                writeToUiAppend(readResult, "selectApplication result: " + selectApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!selectApplicationSuccess) {
+                    writeToUiAppend(readResult, "the selectApplication was not successful, aborted");
+                    return;
+                }
+
+                // create the cyclic file
+                responseData = new byte[2];
+                boolean createCyclicFileAesSuccess = createCyclicFileAes(readResult, aesFileNumberCyclic, responseData);
+                writeToUiAppend(readResult, "createCyclicFileAes result: " + createCyclicFileAesSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!createCyclicFileAesSuccess) {
+                    writeToUiAppend(readResult, "the createCyclicFileAes was not successful, aborted");
+                    return;
+                }
+
+                // authenticate wit aes key 0
+                // this updating the global variables skeyOwn and ivOwn
+                responseData = new byte[2];
+                boolean authenticateWriteSuccess = authenticateApplicationAes(readResult, aesKeyNumberRW, aesKey, false, responseData);
+                writeToUiAppend(readResult, "authenticateWrite result: " + authenticateWriteSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateWriteSuccess) {
+                    writeToUiAppend(readResult, "the authenticationWrite was not successful, aborted");
+                    return;
+                }
+
+                // we do need the Cryp unit
+                Cryp cryp = new Cryp(skeyOwn, ivOwn);
+                // writeToUiAppend(readResult, printData("IV before write 1", cryp.getIv()));
+
+                // write to the cyclic file
+                responseData = new byte[2];
+                // we need to know how long this Cyclic File is
+                //byte[] data = "6655443322".getBytes(StandardCharsets.UTF_8);
+                byte[] dataStandard24 =  "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8);
+                byte[] dataStandard32 = "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8);
+                byte[] dataStandard28 = "1234567890123456789012345678".getBytes(StandardCharsets.UTF_8);
+                boolean writeEncryptedDataSuccess = writeToCyclicFileAes(readResult, aesFileNumberCyclic, dataStandard28, responseData, cryp);
+                writeToUiAppend(readResult, "writeEncryptedData result: " + writeEncryptedDataSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!writeEncryptedDataSuccess) {
+                    writeToUiAppend(readResult, "the writeEncryptedData was not successful, aborted");
+                    return;
+                }
+
+                // update the IV
+                ivOwn = cryp.getIv();
+                //writeToUiAppend(readResult, printData("IV after write 1", cryp.getIv()));
+
+                // commit the write
+                responseData = new byte[2];
+                boolean writeToFileCommitSuccess = commitWriteToFile(readResult, responseData);
+                writeToUiAppend(readResult, "writeToFileCommit success: " + writeToFileCommitSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!writeToFileCommitSuccess) {
+                    writeToUiAppend(readResult, "writeToFileCommit was not successful, aborted");
+                    //return;
+                }
+
+                // stop here as the IV IS NOT UPDATED or do another authentication
+
+                // authenticate wit aes key 0
+                // this updating the global variables skeyOwn and ivOwn
+                responseData = new byte[2];
+                authenticateWriteSuccess = authenticateApplicationAes(readResult, aesKeyNumberRW, aesKey, false, responseData);
+                writeToUiAppend(readResult, "authenticateWrite result: " + authenticateWriteSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateWriteSuccess) {
+                    writeToUiAppend(readResult, "the authenticationWrite was not successful, aborted");
+                    return;
+                }
+
+                // we do need the Cryp unit
+                cryp = new Cryp(skeyOwn, ivOwn);
+
+                // write a second entry to the cyclic file
+                responseData = new byte[2];
+                // we need to know how long this Cyclic File is
+                //byte[] data = "6655443322".getBytes(StandardCharsets.UTF_8);
+                //byte[] dataStandard24 =  "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8);
+                //byte[] dataStandard32 = "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8);
+                byte[] dataStandard28a = "AA34567890123456789012345678".getBytes(StandardCharsets.UTF_8);
+                // the timestamp is 19 characters long so in total 28 characters to write
+                byte[] data28 = ("AA " + Utils.getTimestamp() + "      ").getBytes(StandardCharsets.UTF_8);
+                writeEncryptedDataSuccess = writeToCyclicFileAes(readResult, aesFileNumberCyclic, data28, responseData, cryp);
+                writeToUiAppend(readResult, "writeEncryptedData result: " + writeEncryptedDataSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!writeEncryptedDataSuccess) {
+                    writeToUiAppend(readResult, "the writeEncryptedData was not successful, aborted");
+                    return;
+                }
+
+                // update the IV
+                ivOwn = cryp.getIv();
+                // writeToUiAppend(readResult, printData("IV after write 2", cryp.getIv()));
+
+                // commit the second write
+                responseData = new byte[2];
+                writeToFileCommitSuccess = commitWriteToFile(readResult, responseData);
+                writeToUiAppend(readResult, "writeToFileCommit success: " + writeToFileCommitSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!writeToFileCommitSuccess) {
+                    writeToUiAppend(readResult, "writeToFileCommit was not successful, aborted");
+                    //return;
+                }
+
+                // update the IV
+                //ivOwn = cryp.getIv();
+                //writeToUiAppend(readResult, printData("IV after commit 2", cryp.getIv()));
+            }
+        });
+
+        btn33.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // read an AES encrypted Cyclic file written by btn32
+                byte[] AES_AID = Utils.hexStringToByteArray("414240");
+                byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                byte[] desKey = new byte[8]; // for the master application
+                byte desKeyNumber0 = (byte) 0; // for the master application
+                byte[] aesKey = new byte[16];
+                byte aesKeyNumberRW = (byte) 0;
+                int aesFileNumberCyclic = 5;
+                int aesFileNumberCyclicSize = 28;
+
+                // select the master file application
+                byte[] responseData = new byte[2];
+                boolean selectMasterApplicationSuccess = selectApplicationDes(readResult, AID_Master, responseData);
+                writeToUiAppend(readResult, "selectMasterApplication result: " + selectMasterApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+
+                // authenticate
+                responseData = new byte[2];
+                // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
+                boolean authenticateMasterSuccess = authenticateApplicationDes(readResult, desKeyNumber0, desKey, false, responseData);
+                writeToUiAppend(readResult, "authenticateMasterApplication result: " + authenticateMasterSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateMasterSuccess) {
+                    writeToUiAppend(readResult, "the authenticationMaster was not successful, aborted");
+                    return;
+                }
+
+                // select the application
+                responseData = new byte[2];
+                boolean selectApplicationSuccess = selectApplicationDes(readResult, AES_AID, responseData);
+                writeToUiAppend(readResult, "selectApplication result: " + selectApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!selectApplicationSuccess) {
+                    writeToUiAppend(readResult, "the selectApplication was not successful, aborted");
+                    return;
+                }
+
+                // authenticate wit aes key 0
+                responseData = new byte[2];
+                boolean authenticateWriteSuccess = authenticateApplicationAes(readResult, aesKeyNumberRW, aesKey, true, responseData);
+                writeToUiAppend(readResult, "authenticateWrite result: " + authenticateWriteSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateWriteSuccess) {
+                    writeToUiAppend(readResult, "the authenticationWrite was not successful, aborted");
+                    return;
+                }
+
+                // we do need the Cryp unit
+                Cryp cryp = new Cryp(skeyOwn, ivOwn);
+
+                // read from the cyclic file
+
+                // read the cyclic file
+                responseData = new byte[2];
+                // we need to know how long this Standard File is
+                byte[] readEncryptedData = readFromCyclicFileAes(readResult, (byte) (aesFileNumberCyclic & 0xff), responseData, cryp, aesFileNumberCyclicSize);
+
+                // update the IV
+                ivOwn = cryp.getIv();
+
+                writeToUiAppend(readResult, printData("readEncryptedData", readEncryptedData));
+                writeToUiAppend(readResult, printData("responseData", responseData));
+                if (readEncryptedData != null) {
+                    writeToUiAppend(readResult, new String(readEncryptedData, StandardCharsets.UTF_8));
+                } else {
+                    writeToUiAppend(readResult, "no data available");
+                }
+
+            }
+        });
+
 
     }
 
@@ -4179,7 +4474,12 @@ but now I can work on reading the AES encrypted file
         // here we are using key 1 for read and key2 for write access access, key0 has read&write access + change rights !
         byte accessRightsRwCar = (byte) 0x00; // Read&Write Access & ChangeAccessRights
         byte accessRightsRW = (byte) 0x12; // Read Access & Write Access // read with key 1, write with key 2
-        byte[] fileSize = new byte[]{(byte) 0x20, (byte) 0xf00, (byte) 0x00}; // 32 bytes
+
+        // DO NOT EXTEND THE FILESIZE > 28 bytes, that will crash the write method because the CRC is appended
+        // if you do have more data to write you have to chunk them, nit supported here
+        //byte[] fileSize = new byte[]{(byte) 0x20, (byte) 0xf00, (byte) 0x00}; // 32 bytes
+        byte[] fileSize = new byte[]{(byte) 0x1c, (byte) 0x00, (byte) 0x00}; // 28 bytes
+
         byte[] createStandardFileParameters = new byte[7];
         createStandardFileParameters[0] = fileNumber;
         createStandardFileParameters[1] = commSettingsByte;
@@ -4317,7 +4617,7 @@ but now I can work on reading the AES encrypted file
         if (fileNumber > (byte) 0x0A) return false;
         if (data == null) return false;
         if (data.length == 0) return false;
-        if (data.length > 32) return false;
+        if (data.length > 28) return false; // DO NOT EXTEND THIS
 
         // write to file
         byte writeStandardFileCommand = (byte) 0x3d;
@@ -4543,7 +4843,7 @@ but now I can work on reading the AES encrypted file
      * create cyclic file - this is using a FIXED key number 1 for read and write access
      * So don't forget that your application does need a minimum of 2 keys
      * The number of records is FIXED to 6 (5 entries + 1 spare entry)
-     * The size of a record is FIXED to 32 bytes
+     * The size of a record is FIXED to 32 bytes for unencrypted and 28 bytes for AES encrypted
      *
      * @param logTextView
      * @param fileNumber
@@ -4623,40 +4923,15 @@ but now I can work on reading the AES encrypted file
         }
     }
 
-    private boolean createCyclicFileEncryptedCommunication(TextView logTextView, byte fileNumber, byte[] response) {
+    private boolean createCyclicFileAes(TextView logTextView, int fileNumber, byte[] response) {
         // create the CyclicRecordFile
         byte createCyclicFileCommand = (byte) 0xc0;
-        final byte RECORD_SIZE = (byte) 0x20; // 32 bytes
-        final byte NUMBER_OF_RECORDS = (byte) 0x06;
-        byte commSettingsByte = (byte) 0x03; // encrypted communication
-                /*
-                M0775031 DESFIRE
-                Plain Communication = 0;
-                Plain communication secured by DES/3DES MACing = 1;
-                Fully DES/3DES enciphered communication = 3;
-                 */
-        byte[] accessRights = new byte[]{(byte) 0xee, (byte) 0xee}; // should mean plain/free access without any keys
-        // here we are using key 1 for every access !
-        //byte accessRightsRwCar = (byte) 0x11; // Read&Write Access & ChangeAccessRights
-        //byte accessRightsRW = (byte) 0x11; // Read Access & Write Access
 
-        // here we are using key 0 for every access !
-        byte accessRightsRwCar = (byte) 0x00; // Read&Write Access & ChangeAccessRights
-        byte accessRightsRW = (byte) 0x00; // Read Access & Write Access
-
-                /*
-                There are four different Access Rights (2 bytes for each file) stored for each file within
-                each application:
-                - Read Access
-                - Write Access
-                - Read&Write Access
-                - ChangeAccessRights
-                 */
-
-        // create a value file in the new application: fileNo=6, cs=3
-        //ar1 = 0x00;  // RW|CAR
-        //ar2 = 0x00;  // R|W
-
+        PayloadBuilder pb = new PayloadBuilder();
+        final int aesFileCyclicSize = 28;
+        final int aesFileCyclicRecords = 6;
+        byte[] createCyclicFileParameters = pb.createCyclicRecordsFile(fileNumber, PayloadBuilder.CommunicationSetting.Encrypted,
+                0, 0, 1, 2, aesFileCyclicSize, aesFileCyclicRecords);
         /* @param payload	10-byte array with the following contents:
          * 					<br>file number (1 byte),
          * 					<br>communication settings (1 byte),
@@ -4667,20 +4942,14 @@ but now I can work on reading the AES encrypted file
          * @throws IOException
          */
 
-        byte[] createCyclicFileParameters = new byte[10]; // just to show the length
-        createCyclicFileParameters = new byte[]{
-                fileNumber, commSettingsByte, accessRightsRwCar, accessRightsRW,
-                RECORD_SIZE, 0, 0,   // size of record fixed to dec 32
-                NUMBER_OF_RECORDS, 0, 0 // maximum amount of records, fixed to dec 6
-        };
-
         writeToUiAppend(logTextView, printData("createCyclicFileParameters", createCyclicFileParameters));
         byte[] createCyclicFileResponse = new byte[0];
+
         try {
             createCyclicFileResponse = isoDep.transceive(wrapMessage(createCyclicFileCommand, createCyclicFileParameters));
         } catch (Exception e) {
             //throw new RuntimeException(e);
-            writeToUiAppend(logTextView, "tranceive failed: " + e.getMessage());
+            writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
             return false;
         }
         System.arraycopy(returnStatusBytes(createCyclicFileResponse), 0, response, 0, 2);
@@ -4730,46 +4999,41 @@ but now I can work on reading the AES encrypted file
         }
     }
 
-    private boolean writeToCyclicFileEncrypted(TextView logTextView, byte fileNumber, byte[] response) {
-        // write to the CyclicFile with AES encrypted data
+    private boolean writeToCyclicFileAes(TextView logTextView, int fileNumber, byte[] data, byte[] response, Cryp cryp) {
+        // some sanity checks to avoid any issues
+        if (fileNumber < (byte) 0x00) return false;
+        if (fileNumber > (byte) 0x0A) return false;
+        if (data == null) return false;
+        if (data.length == 0) return false;
+        if (data.length > 28) return false; // DO NOT EXTEND THIS
+
+        // write to the CyclicFile
         byte writeFileCommand = (byte) 0x3b;
-        // byte fileNumberLogCyclicFile; // is defined as constant
-        byte[] offset = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // write to the beginning
-        byte[] dataLength;
-        String contentString = "Entry from " + Utils.getTimestamp(); // timestamp is 19 characters long
-        int contentLengthInt = contentString.length();
-        // todo be more universal with this. The created record size is 32 so this data is fitting into one record
-        byte[] contentLength = new byte[]{(byte) (contentLengthInt & 0xFF), (byte) 0x00, (byte) 0x00};
-        byte[] content = contentString.getBytes(StandardCharsets.UTF_8);
-        byte[] writeFileParameters = new byte[(contentLengthInt + 7)];
-        writeFileParameters[0] = fileNumber;
-        System.arraycopy(offset, 0, writeFileParameters, 1, 3);
-        System.arraycopy(contentLength, 0, writeFileParameters, 4, 3);
-        System.arraycopy(content, 0, writeFileParameters, 7, contentLengthInt);
+
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] writeFileParameters = pb.writeToCyclicRecordsFile(fileNumber, data);
         writeToUiAppend(logTextView, printData("writeFileParameters", writeFileParameters));
-
-        // encryption part
-        // as the first 7 bytes (fileNumber (1), offset (3) and length (3)) are not encrypted the encryptionOffset is 7
-        ktype = KeyType.AES;
-        iv = new byte[16];
-        int encryptionOffset = 2;
-        // missing 1 byte at the end ? for encryption ?
-        byte[] encryptedWriteFileParameters = preprocessAes(writeFileParameters, encryptionOffset);
-        writeToUiAppend(logTextView, printData("encrypted writeFileParameters", encryptedWriteFileParameters));
-
-        encryptionOffset = 7;
-        // for encryption we are working with the wrapped message
-        byte[] encryptedWrappedMessage;
+        byte[] writeFileResponse = new byte[0];
+        byte[] wrappedApdu;
         try {
-            byte[] wrappedMessage = wrapMessage(writeFileCommand, writeFileParameters);
-            writeToUiAppend(logTextView, printData("wrappedMessage", wrappedMessage));
-            encryptedWrappedMessage = preprocessAes(wrappedMessage, encryptionOffset);
-            writeToUiAppend(logTextView, printData("encryptedWrappedMessage", encryptedWrappedMessage));
+            wrappedApdu = wrapMessage(writeFileCommand, writeFileParameters);
+            byte[] wrappedEncryptedApdu = cryp.preprocess(wrappedApdu, 7, DesfireFileCommunicationSettings.ENCIPHERED);
+            writeToUiAppend(logTextView, printData("wrapped plain apdu", wrappedApdu));
+            writeToUiAppend(logTextView, printData("wrapped ciph  apdu", wrappedEncryptedApdu));
+            writeFileResponse = isoDep.transceive(wrappedEncryptedApdu);
         } catch (Exception e) {
-            writeToUiAppend(logTextView, "wrapMessage failed: " + e.getMessage());
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "tranceive failed: " + e.getMessage());
             return false;
         }
-
+        writeToUiAppend(logTextView, printData("writeFileResponse", writeFileResponse));
+        System.arraycopy(returnStatusBytes(writeFileResponse), 0, response, 0, 2);
+        if (checkResponse(writeFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 
 
 /*
@@ -4794,31 +5058,6 @@ writeFileResponse length: 2 data: 917e length error
 
  */
 
-        // is there an 0x00 at the end from somewhere ? delete it
-        byte[] encryptedWrappedMessageTrimmed = Arrays.copyOf(encryptedWrappedMessage, (encryptedWrappedMessage.length - 1));
-        writeToUiAppend(logTextView, printData("encryptedWrappedMes l-1", encryptedWrappedMessageTrimmed));
-
-
-
-        byte[] writeFileResponse = new byte[0];
-        try {
-            //writeFileResponse = isoDep.transceive(wrapMessage(writeFileCommand, writeFileParameters));
-            //writeFileResponse = isoDep.transceive(wrapMessage(writeFileCommand, encryptedWriteFileParameters));
-            //writeFileResponse = isoDep.transceive(encryptedWrappedMessage);
-            writeFileResponse = isoDep.transceive(encryptedWrappedMessageTrimmed);
-        } catch (Exception e) {
-            //throw new RuntimeException(e);
-            writeToUiAppend(logTextView, "tranceive failed: " + e.getMessage());
-            return false;
-        }
-        writeToUiAppend(logTextView, printData("writeFileResponse", writeFileResponse));
-        System.arraycopy(returnStatusBytes(writeFileResponse), 0, response, 0, 2);
-        if (checkResponse(writeFileResponse)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
 
     /**
      * codes taken from DESFireEV1.java
@@ -4982,6 +5221,31 @@ writeFileResponse length: 2 data: 917e length error
         }
     }
 
+    // this is not working at the moment !!
+    private boolean commitWriteToFileAes(TextView logTextView, byte[] response, Cryp cryp) {
+        // even if there is no data to encrypt we need to update the IV
+        // don't forget to commit all changes
+        byte commitCommand = (byte) 0xc7;
+        byte[] commitResponse = new byte[0];
+        byte[] wrapApdu;
+        try {
+            wrapApdu = wrapMessage(commitCommand, null);
+            byte [] wrapApduAes = cryp.preprocess(wrapApdu, 0, DesfireFileCommunicationSettings.ENCIPHERED); // this will update the iv
+            commitResponse = isoDep.transceive(wrapApduAes);
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "tranceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(logTextView, printData("commitResponse", commitResponse));
+        System.arraycopy(returnStatusBytes(commitResponse), 0, response, 0, 2);
+        if (checkResponse(commitResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     private byte[] readFromCyclicFile(TextView logTextView, byte fileNumber, byte[] recordNumber, byte[] numberOfRecords, byte[] response, boolean firstRun) {
         // read from to the CyclicFile
         byte[] readFileParameters = new byte[7];
@@ -5028,6 +5292,46 @@ writeFileResponse length: 2 data: 917e length error
 
         return readFileResponse;
     }
+
+    private byte[] readFromCyclicFileAes(TextView logTextView, byte fileNumber, byte[] response, Cryp cryp, int lengthInt) {
+        // we read from a cyclic file within the selected application
+
+        // this is manual doing at the moment
+        byte readFileCommand = (byte) 0xbb;
+
+        byte[] offset = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00};
+        byte[] recordNumber = new byte[]{(byte) 0x03, (byte) 0x00, (byte) 0x00}; // 00 is the youngest, 04 is the oldest entry
+        byte[] numberOfRecords = new byte[]{(byte) 0x01, (byte) 0x00, (byte) 0x00};
+
+        byte[] readFileParameters = new byte[7];
+        readFileParameters[0] = fileNumber;
+        System.arraycopy(recordNumber, 0, readFileParameters, 1, 3);
+        System.arraycopy(numberOfRecords, 0, readFileParameters, 4, 3);
+        writeToUiAppend(logTextView, printData("readFileParameters", readFileParameters));
+
+        byte[] readFileResponse = new byte[0];
+        byte[] wrappedApdu;
+        try {
+            wrappedApdu = wrapMessage(readFileCommand, readFileParameters);
+            readFileResponse = isoDep.transceive(wrappedApdu);
+            writeToUiAppend(logTextView, printData("send APDU", wrappedApdu));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(readResult, "tranceive failed: " + e.getMessage());
+            return null;
+        }
+        writeToUiAppend(logTextView, printData("readStandardFileResponse", readFileResponse));
+        System.arraycopy(returnStatusBytes(readFileResponse), 0, response, 0, 2);
+        //byte[] responseWithoutStatus = Arrays.copyOf(readStandardFileResponse, readStandardFileResponse.length - 2);
+        // first we need to update the IV with the apduCommand
+        cryp.preprocessPlain(wrappedApdu);
+        // now we can decrypt the received data
+        byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponse, lengthInt); // takes the complete response
+        writeToUiAppend(logTextView, printData("decryptedResponse", decryptedResponse));
+        if (decryptedResponse == null) System.arraycopy(new byte[2], 0, response, 0, 2);
+        return decryptedResponse;
+    }
+
 
     private boolean clearRecordFile(TextView logTextView, byte fileNumber, byte[] response) {
         // clear the CyclicFile

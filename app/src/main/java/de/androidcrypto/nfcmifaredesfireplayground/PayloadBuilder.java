@@ -42,7 +42,7 @@ public class PayloadBuilder {
         byte communicationSettings = 0;
         if (communicationSetting == CommunicationSetting.Plain) communicationSettings = (byte) 0x00;
         if (communicationSetting == CommunicationSetting.MACed) communicationSettings = (byte) 0x01;
-        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03; // todo check on this later
+        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03;
         byte accessRightsRwCar = (byte) ((keyRW << 4) | (keyCar & 0x0F)); // Read&Write Access & ChangeAccessRights
         byte accessRightsRW = (byte) ((keyR << 4) | (keyW & 0x0F)) ;// Read Access & Write Access // read with key 0, write with key 0
         byte[] fileSizeByte = intTo3ByteArrayLsb(fileSize);
@@ -97,7 +97,7 @@ public class PayloadBuilder {
         byte communicationSettings = 0;
         if (communicationSetting == CommunicationSetting.Plain) communicationSettings = (byte) 0x00;
         if (communicationSetting == CommunicationSetting.MACed) communicationSettings = (byte) 0x01;
-        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03; // todo check on this later
+        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03;
         byte accessRightsRwCar = (byte) ((keyRW << 4) | (keyCar & 0x0F)); // Read&Write Access & ChangeAccessRights
         byte accessRightsRW = (byte) ((keyR << 4) | (keyW & 0x0F)) ;// Read Access & Write Access // read with key 0, write with key 0
 
@@ -161,7 +161,7 @@ public class PayloadBuilder {
         byte communicationSettings = 0;
         if (communicationSetting == CommunicationSetting.Plain) communicationSettings = (byte) 0x00;
         if (communicationSetting == CommunicationSetting.MACed) communicationSettings = (byte) 0x01;
-        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03; // todo check on this later
+        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03;
         byte accessRightsRwCar = (byte) ((keyRW << 4) | (keyCar & 0x0F)); // Read&Write Access & ChangeAccessRights
         byte accessRightsRW = (byte) ((keyR << 4) | (keyW & 0x0F)) ;// Read Access & Write Access // read with key 0, write with key 0
         byte[] fileSizeByte = intTo3ByteArrayLsb(fileSize);
@@ -207,7 +207,7 @@ public class PayloadBuilder {
         byte communicationSettings = 0;
         if (communicationSetting == CommunicationSetting.Plain) communicationSettings = (byte) 0x00;
         if (communicationSetting == CommunicationSetting.MACed) communicationSettings = (byte) 0x01;
-        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03; // todo check on this later
+        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03;
         byte accessRightsRwCar = (byte) ((keyRW << 4) | (keyCar & 0x0F)); // Read&Write Access & ChangeAccessRights
         byte accessRightsRW = (byte) ((keyR << 4) | (keyW & 0x0F)) ;// Read Access & Write Access // read with key 0, write with key 0
         byte[] fileSizeByte = intTo3ByteArrayLsb(fileSize);
