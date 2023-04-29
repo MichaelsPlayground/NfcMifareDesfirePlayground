@@ -147,6 +147,7 @@ public class Cryp {
             System.out.println("plaintext: " + Utils.bytesToHex(plaintext));
         } else {
             System.out.println("plaintext is NULL");
+            return null;
         }
 
         byte[] crc;

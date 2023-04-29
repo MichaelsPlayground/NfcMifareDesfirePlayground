@@ -5300,8 +5300,8 @@ writeFileResponse length: 2 data: 917e length error
         byte readFileCommand = (byte) 0xbb;
 
         byte[] offset = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00};
-        byte[] recordNumber = new byte[]{(byte) 0x03, (byte) 0x00, (byte) 0x00}; // 00 is the youngest, 04 is the oldest entry
-        byte[] numberOfRecords = new byte[]{(byte) 0x01, (byte) 0x00, (byte) 0x00};
+        byte[] recordNumber = new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00}; // 00 is the youngest, 04 is the oldest entry
+        byte[] numberOfRecords = new byte[]{(byte) 0x05, (byte) 0x00, (byte) 0x00}; // 05 is the maximum
 
         byte[] readFileParameters = new byte[7];
         readFileParameters[0] = fileNumber;
@@ -5317,16 +5317,71 @@ writeFileResponse length: 2 data: 917e length error
             writeToUiAppend(logTextView, printData("send APDU", wrappedApdu));
         } catch (Exception e) {
             //throw new RuntimeException(e);
-            writeToUiAppend(readResult, "tranceive failed: " + e.getMessage());
+            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
             return null;
         }
-        writeToUiAppend(logTextView, printData("readStandardFileResponse", readFileResponse));
+        writeToUiAppend(logTextView, printData("readFileResponse1", readFileResponse));
         System.arraycopy(returnStatusBytes(readFileResponse), 0, response, 0, 2);
         //byte[] responseWithoutStatus = Arrays.copyOf(readStandardFileResponse, readStandardFileResponse.length - 2);
         // first we need to update the IV with the apduCommand
         cryp.preprocessPlain(wrappedApdu);
+
+        // todo manual - run subsequent readings
+        byte[] responseWithoutStatus1 = Arrays.copyOf(readFileResponse, readFileResponse.length - 2);
+
+        byte moreDataCommand = (byte) 0xaf;
+        byte[] responseWithoutStatus2 = new byte[0];
+        byte[] responseWithoutStatus3 = new byte[0];
+        byte[] responseWithStatus3 = new byte[0];
+        try {
+            wrappedApdu = wrapMessage(moreDataCommand, null);
+            readFileResponse = isoDep.transceive(wrappedApdu);
+            writeToUiAppend(logTextView, printData("send APDU", wrappedApdu));
+            writeToUiAppend(logTextView, printData("readFileResponse2", readFileResponse));
+            responseWithoutStatus2 = Arrays.copyOf(readFileResponse, readFileResponse.length - 2);
+            readFileResponse = isoDep.transceive(wrappedApdu);
+            writeToUiAppend(logTextView, printData("send APDU", wrappedApdu));
+            writeToUiAppend(logTextView, printData("readFileResponse3", readFileResponse));
+            responseWithoutStatus3 = Arrays.copyOf(readFileResponse, readFileResponse.length - 2);
+            responseWithStatus3 = readFileResponse.clone();
+
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
+
+        }
+        // concat the responses
+        int completeResponseLength = responseWithoutStatus1.length +  responseWithoutStatus2.length + responseWithoutStatus3.length;
+        writeToUiAppend(logTextView, "completeResponseLength: " + completeResponseLength);
+        byte[] readFileResponseComplete = new byte[completeResponseLength];
+        System.arraycopy(responseWithoutStatus1, 0, readFileResponseComplete, 0, responseWithoutStatus1.length);
+        System.arraycopy(responseWithoutStatus2, 0, readFileResponseComplete, (responseWithoutStatus1.length), responseWithoutStatus2.length);
+        System.arraycopy(responseWithoutStatus3, 0, readFileResponseComplete, (responseWithoutStatus1.length + responseWithoutStatus2.length), responseWithoutStatus3.length);
+        writeToUiAppend(logTextView, printData("readFileResponseComplete", readFileResponseComplete));
+
+        // make a manual decrypt
+        try {
+            byte[] decManual = decryptAes(readFileResponseComplete, skeyOwn, cryp.getIv());
+            writeToUiAppend(logTextView, printData("manualDecryption", decManual));
+            if (decManual != null) writeToUiAppend(logTextView, new String(decManual, StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            writeToUiAppend(logTextView, "error on manual decryption + " + e.getMessage());
+        }
+
+        // this is by leaving the last 9100 at the end
+        int completeResponseLength2 = responseWithoutStatus1.length +  responseWithoutStatus2.length + responseWithStatus3.length;
+        writeToUiAppend(logTextView, "completeResponseLength2: " + completeResponseLength2);
+        byte[] readFileResponseComplete2 = new byte[completeResponseLength2];
+        System.arraycopy(responseWithoutStatus1, 0, readFileResponseComplete2, 0, responseWithoutStatus1.length);
+        System.arraycopy(responseWithoutStatus2, 0, readFileResponseComplete2, (responseWithoutStatus1.length), responseWithoutStatus2.length);
+        System.arraycopy(responseWithStatus3, 0, readFileResponseComplete2, (responseWithoutStatus1.length + responseWithoutStatus2.length), responseWithStatus3.length);
+        writeToUiAppend(logTextView, printData("readFileResponseComplete2", readFileResponseComplete2));
+
+
+
+        byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponseComplete2, lengthInt); // takes the complete response
         // now we can decrypt the received data
-        byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponse, lengthInt); // takes the complete response
+        //byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponse, lengthInt); // takes the complete response
         writeToUiAppend(logTextView, printData("decryptedResponse", decryptedResponse));
         if (decryptedResponse == null) System.arraycopy(new byte[2], 0, response, 0, 2);
         return decryptedResponse;
