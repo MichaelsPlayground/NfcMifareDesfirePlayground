@@ -320,6 +320,39 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     writeToUiAppend(readResult, "the getFreeMemory was not successful, aborted");
                     return;
                 }
+
+                // run the AES Originality Check
+                // Specify the DESFire EV1 card's AID
+                //final byte[] DESFIRE_AID = {(byte)0x12, (byte)0x34, (byte)0x56};
+                final byte[] DESFIRE_AID = {(byte)0x00, (byte)0x00, (byte)0x00};
+                // Specify the AES key to be checked (16 bytes in hex format)
+                byte[] aesKey = {(byte)0x01, (byte)0x23, (byte)0x45,
+                        (byte)0x67, (byte)0x89, (byte)0xAB, (byte)0xCD, (byte)0xEF, (byte)0xFE,
+                        (byte)0xDC, (byte)0xBA, (byte)0x98, (byte)0x76, (byte)0x54, (byte)0x32,
+                        (byte)0x10};
+
+                responseData = new byte[2];
+                boolean selectApp = selectApplicationDes(readResult, DESFIRE_AID, responseData);
+                writeToUiAppend(readResult, printData("responseData selectApp", responseData));
+                // Perform the AES Originality Check
+                byte checkCommand = (byte) 0x64;
+                byte[] readResponse = new byte[0];
+                try {
+                    byte[] wrappedApdu = wrapMessage(checkCommand, aesKey);
+                    readResponse = isoDep.transceive(wrappedApdu);
+                } catch (Exception e) {
+                    //throw new RuntimeException(e);
+                    writeToUiAppend(readResult, "Exception: " + e.getMessage());
+                }
+                byte[] command = {(byte)0x90, (byte)0x64, (byte)0x00,
+                        (byte)0x00, (byte)0x10};
+                byte[] data = aesKey;
+                //response = sendCommand(card, command, data);
+                writeToUiAppend(readResult, printData("readResponse", readResponse));
+                boolean isOriginal = checkResponse(readResponse);
+                writeToUiAppend(readResult, "AES Originality Check: " + isOriginal);
+                System.out.println("AES Originality Check: " + isOriginal);
+
             }
         });
 
