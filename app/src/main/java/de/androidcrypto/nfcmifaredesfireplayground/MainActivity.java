@@ -3165,7 +3165,7 @@ but now I can work on reading the AES encrypted file
                 byte desKeyNumber0 = (byte) 0; // for the master application
                 byte[] aesKey = new byte[16];
                 byte aesKeyNumberRW = (byte) 0;
-                int aesFileNumberStandard = 1;
+                int aesFileNumberStandard = 4; // 1 written by DesFireEv1, 4 written by btn28
                 int aesFileNumberStandardSize = 32;
 
 
@@ -3314,7 +3314,7 @@ but now I can work on reading the AES encrypted file
                 byte desKeyNumber0 = (byte) 0; // for the master application
                 byte[] aesKey = new byte[16];
                 byte aesKeyNumberRW = (byte) 0;
-                int aesFileNumberStandard = 3; // this is file no 03 = self written encrypted data
+                int aesFileNumberStandard = 4; // this is file no 04 = self written encrypted data
                 int aesFileNumberStandardSize = 32;
 
                 // select the master file application
@@ -3343,10 +3343,10 @@ but now I can work on reading the AES encrypted file
 
                 // create the standard file
                 responseData = new byte[2];
-                boolean createStandardFileSuccess = createStandardFile(readResult, (byte) (aesFileNumberStandard & 0xff), responseData);
-                writeToUiAppend(readResult, "createStandardFile result: " + createStandardFileSuccess + " with response: " + Utils.bytesToHex(responseData));
-                if (!createStandardFileSuccess) {
-                    writeToUiAppend(readResult, "the createStandardFile was not successful, aborted");
+                boolean createStandardFileAesSuccess = createStandardFileAes(readResult, (byte) (aesFileNumberStandard & 0xff), responseData);
+                writeToUiAppend(readResult, "createStandardFileAes result: " + createStandardFileAesSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!createStandardFileAesSuccess) {
+                    writeToUiAppend(readResult, "the createStandardFileAes was not successful, aborted");
                     return;
                 }
 
@@ -4156,6 +4156,59 @@ but now I can work on reading the AES encrypted file
         }
     }
 
+    private boolean createStandardFileAes(TextView logTextView, byte fileNumber, byte[] response) {
+        // we create a standard file within the selected application
+        byte createStandardFileCommand = (byte) 0xcd;
+        // CD | File No | Comms setting byte | Access rights (2 bytes) | File size (3 bytes)
+        byte commSettingsByte = (byte) 0x03; // encryption
+                /*
+                M0775031 DESFIRE
+                Plain Communication = 0;
+                Plain communication secured by DES/3DES MACing = 1;
+                Fully DES/3DES enciphered communication = 3;
+                 */
+        byte[] accessRights = new byte[]{(byte) 0xee, (byte) 0xee}; // should mean plain/free access without any keys
+                /*
+                There are four different Access Rights (2 bytes for each file) stored for each file within
+                each application:
+                - Read Access
+                - Write Access
+                - Read&Write Access
+                - ChangeAccessRights
+                 */
+        // here we are using key 1 for read and key2 for write access access, key0 has read&write access + change rights !
+        byte accessRightsRwCar = (byte) 0x00; // Read&Write Access & ChangeAccessRights
+        byte accessRightsRW = (byte) 0x12; // Read Access & Write Access // read with key 1, write with key 2
+        byte[] fileSize = new byte[]{(byte) 0x20, (byte) 0xf00, (byte) 0x00}; // 32 bytes
+        byte[] createStandardFileParameters = new byte[7];
+        createStandardFileParameters[0] = fileNumber;
+        createStandardFileParameters[1] = commSettingsByte;
+        createStandardFileParameters[2] = accessRightsRwCar;
+        createStandardFileParameters[3] = accessRightsRW;
+        System.arraycopy(fileSize, 0, createStandardFileParameters, 4, 3);
+        writeToUiAppend(readResult, printData("createStandardFileParameters", createStandardFileParameters));
+        byte[] createStandardFileResponse = new byte[0];
+        try {
+            createStandardFileResponse = isoDep.transceive(wrapMessage(createStandardFileCommand, createStandardFileParameters));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(readResult, "tranceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(readResult, printData("createStandardFileResponse", createStandardFileResponse));
+        System.arraycopy(returnStatusBytes(createStandardFileResponse), 0, response, 0, 2);
+        writeToUiAppend(logTextView, printData("createStandardFileResponse", createStandardFileResponse));
+        if (checkDuplicateError(createStandardFileResponse)) {
+            writeToUiAppend(logTextView, "the file was not created as it already exists, proceed");
+            return true;
+        }
+        if (checkResponse(createStandardFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     private byte[] readFromStandardFile(TextView logTextView, byte fileNumber, byte[] response) {
         // we read from a standard file within the selected application
 
@@ -4303,7 +4356,7 @@ but now I can work on reading the AES encrypted file
 // btn
 // ### write fullAPDU 1 length: 37 data: 903d00001f010000001800006162636465666768696a6b6c6d6e6f70717273747576777800
 // ### write fullAPDU 2 length: 45 data: 903d0000270100000018000044c301ee90aef1a35377a91a053bbc51161fdc6f4c70d69b4ffed9ad760f701a00
-// this method                                      | difference
+// this method                                      | difference is filenumber
 //   wrapped plain apdu length: 37 data: 903d00001f030000001800006162636465666768696a6b6c6d6e6f70717273747576777800
 //   wrapped ciph  apdu length: 45 data: 903d0000270300000018000094761119877a8ab657663786402e14eb1425b3fd67ae6ebca428e10d91695bd000
             byte[] wrappedEncryptedApdu = cryp.preprocess(wrappedApdu, 7, DesfireFileCommunicationSettings.ENCIPHERED);
