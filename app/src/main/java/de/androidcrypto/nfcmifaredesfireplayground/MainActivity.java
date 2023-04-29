@@ -39,11 +39,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.AccessControlException;
+import java.security.Key;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -324,7 +326,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 // run the AES Originality Check
                 // Specify the DESFire EV1 card's AID
                 //final byte[] DESFIRE_AID = {(byte)0x12, (byte)0x34, (byte)0x56};
-                final byte[] DESFIRE_AID = {(byte)0x00, (byte)0x00, (byte)0x00};
+                //final byte[] DESFIRE_AID = {(byte)0x00, (byte)0x00, (byte)0x00};
+                final byte[] DESFIRE_AID = {(byte)0x11, (byte)0x12, (byte)0x10};
                 // Specify the AES key to be checked (16 bytes in hex format)
                 byte[] aesKey = {(byte)0x01, (byte)0x23, (byte)0x45,
                         (byte)0x67, (byte)0x89, (byte)0xAB, (byte)0xCD, (byte)0xEF, (byte)0xFE,
@@ -334,11 +337,17 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 responseData = new byte[2];
                 boolean selectApp = selectApplicationDes(readResult, DESFIRE_AID, responseData);
                 writeToUiAppend(readResult, printData("responseData selectApp", responseData));
+
+                // authenticate
+                boolean auth = authenticateApplicationDes(readResult, (byte) 0, new byte[8], false, responseData);
+        /*
                 // Perform the AES Originality Check
-                byte checkCommand = (byte) 0x64;
+                byte checkCommand = (byte) 0x60;
                 byte[] readResponse = new byte[0];
                 try {
-                    byte[] wrappedApdu = wrapMessage(checkCommand, aesKey);
+                    //byte[] wrappedApdu = wrapMessage(checkCommand, aesKey);
+                    byte[] wrappedApdu = wrapMessage(checkCommand, new byte[16]);
+                    writeToUiAppend(readResult, printData("wrappedApdu", wrappedApdu));
                     readResponse = isoDep.transceive(wrappedApdu);
                 } catch (Exception e) {
                     //throw new RuntimeException(e);
@@ -352,6 +361,52 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 boolean isOriginal = checkResponse(readResponse);
                 writeToUiAppend(readResult, "AES Originality Check: " + isOriginal);
                 System.out.println("AES Originality Check: " + isOriginal);
+*/
+/*
+                // second
+                byte[] keyData = {(byte) 0x12, (byte) 0x34, (byte) 0x56, (byte) 0x78, (byte) 0x9A, (byte) 0xBC, (byte) 0xDE, (byte) 0xFF, (byte) 0xFE, (byte) 0xDC, (byte) 0xBA, (byte) 0x98, (byte) 0x76, (byte) 0x54, (byte) 0x32, (byte) 0x10};
+                SecretKey aesKey2 = new SecretKeySpec(keyData, "AES");
+
+                byte[] command = new byte[] {
+                        (byte) 0x90, // CLA
+                        (byte) 0x1C, // INS (Authenticate ISO)
+                        (byte) 0x00, // P1
+                        (byte) 0x00, // P2
+                        (byte) 0x10, // Lc - Length of key data (16 bytes)
+                        (byte) 0xAA, // Padding byte
+                        (byte) 0x00 // Padding byte
+                };
+
+// Set the key in the session key
+                Key diversificationData = KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
+                byte[] response = session.authenticate(new byte[] {(byte) 0x01}, KeyBuilder.TYPE_AES, diversificationData, (short) 0x0000, command, (short) 0x0000, (short) command.length);
+
+// Check the response code
+                if (response[0] == (byte) 0x00) {
+                    // Authentication successful, perform the AES Originality Check
+                    byte[] origCheckCommand = new byte[] {
+                            (byte) 0x90, // CLA
+                            (byte) 0x60, // INS (AES Originality Check)
+                            (byte) 0x00, // P1
+                            (byte) 0x00, // P2
+                            (byte) 0x10, // Lc - Length of key data (16 bytes)
+                            (byte) 0x12, (byte) 0x34, (byte) 0x56, (byte) 0x78, (byte) 0x9A, (byte) 0xBC, (byte) 0xDE, (byte) 0xFF, (byte) 0xFE, (byte) 0xDC, (byte) 0xBA, (byte) 0x98, (byte) 0x76, (byte) 0x54, (byte) 0x32, (byte) 0x10 // Key data (16 bytes)
+                    };
+
+                    response = session.sendCommandAPDU(new CommandAPDU(origCheckCommand));
+
+                    // Check the response code
+                    if (response[0] == (byte) 0x00) {
+                        // Originality check successful
+                    } else {
+                        // Originality check failed
+                    }
+                } else {
+                    // Authentication failed
+                }
+*/
+
+
 
             }
         });
