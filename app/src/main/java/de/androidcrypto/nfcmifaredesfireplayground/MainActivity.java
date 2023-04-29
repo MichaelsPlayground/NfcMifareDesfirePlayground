@@ -5379,7 +5379,7 @@ writeFileResponse length: 2 data: 917e length error
 
 
 
-        byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponseComplete2, lengthInt); // takes the complete response
+        byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponseComplete2, (readFileResponseComplete2.length-6); // takes the complete response
         // now we can decrypt the received data
         //byte[] decryptedResponse = cryp.postprocessEnciphered(readFileResponse, lengthInt); // takes the complete response
         writeToUiAppend(logTextView, printData("decryptedResponse", decryptedResponse));
