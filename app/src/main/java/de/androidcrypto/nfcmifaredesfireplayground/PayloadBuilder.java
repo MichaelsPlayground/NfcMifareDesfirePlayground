@@ -55,6 +55,33 @@ public class PayloadBuilder {
         return payload;
     }
 
+    // special version for testing frames
+    public byte[] createStandardFileMax70(int fileNumber, CommunicationSetting communicationSetting, int keyRW, int keyCar, int keyR, int keyW, int fileSize) {
+        // sanity checks
+        if ((fileNumber < 0) || (fileNumber > 15)) return null;
+        if ((keyRW < 0) || (keyRW > 15)) return null;
+        if ((keyCar < 0) || (keyCar > 15)) return null;
+        if ((keyR < 0) || (keyR > 15)) return null;
+        if ((keyW < 0) || (keyW > 15)) return null;
+        if ((fileSize < 0) || (fileSize > 70)) return null;
+
+        // build
+        byte communicationSettings = 0;
+        if (communicationSetting == CommunicationSetting.Plain) communicationSettings = (byte) 0x00;
+        if (communicationSetting == CommunicationSetting.MACed) communicationSettings = (byte) 0x01;
+        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03;
+        byte accessRightsRwCar = (byte) ((keyRW << 4) | (keyCar & 0x0F)); // Read&Write Access & ChangeAccessRights
+        byte accessRightsRW = (byte) ((keyR << 4) | (keyW & 0x0F)) ;// Read Access & Write Access // read with key 0, write with key 0
+        byte[] fileSizeByte = intTo3ByteArrayLsb(fileSize);
+        byte[] payload = new byte[7];
+        payload[0] = (byte) (fileNumber & 0xff); // fileNumber
+        payload[1] = communicationSettings;
+        payload[2] = accessRightsRwCar;
+        payload[3] = accessRightsRW;
+        System.arraycopy(fileSizeByte, 0, payload, 4, 3);
+        return payload;
+    }
+
     public byte[] writeToStandardFile(int fileNumber, String data) {
         return writeToStandardFile(fileNumber, data.getBytes(StandardCharsets.UTF_8));
     }
@@ -73,6 +100,23 @@ public class PayloadBuilder {
         System.arraycopy(offset, 0, payload, 1, 3);
         System.arraycopy(lengthOfData, 0, payload, 4, 3);
         System.arraycopy(data, 0, payload, 7, data.length);
+        return payload;
+    }
+
+    public byte[] readFromStandardFile(int fileNumber, int offsetToRead, int sizeToRead) {
+        // sanity checks
+        if ((fileNumber < 0) || (fileNumber > 15)) return null;
+        if ((offsetToRead < 0) || (offsetToRead > 40)) return null;
+        if ((sizeToRead < 1) || (sizeToRead > 70)) return null;
+
+        // build
+        byte[] payload = new byte[7];
+        byte fileNumberByte = (byte) (fileNumber & 0xff);
+        byte[] offset = intTo3ByteArrayLsb(offsetToRead);
+        byte[] lengthOfData = intTo3ByteArrayLsb(sizeToRead);
+        payload[0] = (byte) (fileNumber & 0xff); // fileNumber
+        System.arraycopy(offset, 0, payload, 1, 3);
+        System.arraycopy(lengthOfData, 0, payload, 4, 3);
         return payload;
     }
 
