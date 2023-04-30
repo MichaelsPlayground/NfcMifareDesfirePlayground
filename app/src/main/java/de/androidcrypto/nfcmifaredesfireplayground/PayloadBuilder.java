@@ -1,8 +1,10 @@
 package de.androidcrypto.nfcmifaredesfireplayground;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 /**
  * This class generates the payload for commands on Mifare DESFire EV1/2/3 cards
@@ -28,6 +30,28 @@ public class PayloadBuilder {
     /**
      * section for file type 00 = Standard Files
      */
+
+    public byte[] createApplicationIso(byte[] aid, byte keySettings, byte numberOfKeys, byte[] isoFileId, byte[] isoDfName) {
+        // sanity checks
+        if ((aid == null) || (isoFileId == null) || (isoDfName == null)) return null;
+        if (Arrays.equals(aid, new byte[3])) return null;
+        if (aid.length != 3) return null;
+        // todo get a good check on key numbers range because they are combined with the kind of keys:
+        // 00..0f = DES keys, 40..4f TDES keys, 80..8f AES keys
+        //if ((numberOfKeys < 1) || (numberOfKeys > 15)) return null;
+        if (isoFileId.length != 2) return null;
+        if ((isoDfName.length < 1) || (isoDfName.length > 16)) return null;
+
+        // build
+        // we use a ByteArrayOutputStream as the ISO DF Name can be 1 to 15 bytes long
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        baos.write(aid, 0, 3);
+        baos.write(keySettings);
+        baos.write(numberOfKeys);
+        baos.write(isoFileId, 0, 2);
+        baos.write(isoDfName, 0, isoDfName.length);
+        return baos.toByteArray();
+    }
 
     public byte[] createStandardFile(int fileNumber, CommunicationSetting communicationSetting, int keyRW, int keyCar, int keyR, int keyW, int fileSize) {
         // sanity checks

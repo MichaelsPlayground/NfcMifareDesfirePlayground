@@ -4043,6 +4043,53 @@ but now I can work on reading the AES encrypted file
 
             }
         });
+
+        btn35.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // create application in ISO mode with DF Name
+                // see MIFARE DESFire as Type 4 Tag AN11004.pdf
+
+                byte[] AES_AID = Utils.hexStringToByteArray("E2E1E1");
+                byte[] AES_AID_FILE_ID = Utils.hexStringToByteArray("E9E8"); // 2 bytes ISO file id
+                byte[] AES_AID_DF_FILE_NAME = "Testname ISO".getBytes(StandardCharsets.UTF_8); // 1-16 characters
+                byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                byte[] desKey = new byte[8]; // for the master application
+                byte desKeyNumber0 = (byte) 0; // for the master application
+                byte[] aesKey = new byte[16];
+                byte aesKeyNumberRW = (byte) 0;
+                int aesFileNumberStandard = 1;
+                int aesFileNumberStandardSize = 70;
+                // do not extend the fileSize larger than 28 on AES encrypted data or you need to chunk the sending of data
+
+                // select the master file application
+                byte[] responseData = new byte[2];
+                boolean selectMasterApplicationSuccess = selectApplicationDes(readResult, AID_Master, responseData);
+                writeToUiAppend(readResult, "selectMasterApplication result: " + selectMasterApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+
+                // authenticate
+                responseData = new byte[2];
+                // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
+                boolean authenticateMasterSuccess = authenticateApplicationDes(readResult, desKeyNumber0, desKey, false, responseData);
+                writeToUiAppend(readResult, "authenticateMasterApplication result: " + authenticateMasterSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateMasterSuccess) {
+                    writeToUiAppend(readResult, "the authenticationMaster was not successful, aborted");
+                    return;
+                }
+
+                // create the application
+                responseData = new byte[2];
+                boolean createApplicationIsoSuccess = createApplicationIsoDes(readResult, AES_AID, (byte) 0x0f, (byte) 0x83, AES_AID_FILE_ID, AES_AID_DF_FILE_NAME, responseData);
+                writeToUiAppend(readResult, "createApplicationIso result: " + createApplicationIsoSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!createApplicationIsoSuccess) {
+                    writeToUiAppend(readResult, "the createApplication was not successful, aborted");
+                    //return;
+                }
+
+
+
+            }
+        });
     }
 
 
@@ -4564,6 +4611,38 @@ but now I can work on reading the AES encrypted file
         } catch (Exception e) {
             //throw new RuntimeException(e);
             writeToUiAppend(logTextView, "createApplicationAes transceive failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean createApplicationIsoDes(TextView logTextView, byte[] applicationIdentifier, byte keySettings, byte numberOfKeys, byte[] applicationIdentifierFileId, byte[] applicationIdentifierDfName, byte[] response) {
+        if (logTextView == null) return false;
+        if (applicationIdentifier == null) return false;
+        if (applicationIdentifier.length != 3) return false;
+
+        // MIFARE DESFire CreateApplication using the default AID 000001h (see section 6.4.1 for the definition of the allowed AID values),
+        // key settings equal to 0Fh, NumOfKeys equal to 01h, File-ID equal to 10E1h, DF-name equal to D2760000850101
+        //Command: 90 CA 00 00 0E 01 00 00 0F 21 10 E1 D2 76 00 00 85 01 01 00h
+
+        // create an application
+        byte createApplicationCommand = (byte) 0xca;
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] createApplicationParameters = pb.createApplicationIso(applicationIdentifier, keySettings, numberOfKeys, applicationIdentifierFileId, applicationIdentifierDfName);
+        writeToUiAppend(logTextView, printData("createApplicationIsoParameters", createApplicationParameters));
+        byte[] createApplicationResponse = new byte[0];
+        try {
+            createApplicationResponse = isoDep.transceive(wrapMessage(createApplicationCommand, createApplicationParameters));
+            writeToUiAppend(logTextView, printData("createApplicationIsoResponse", createApplicationResponse));
+            System.arraycopy(returnStatusBytes(createApplicationResponse), 0, response, 0, 2);
+            //System.arraycopy(createApplicationResponse, 0, response, 0, createApplicationResponse.length);
+            if (checkResponse(createApplicationResponse)) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "createApplicationIso transceive failed: " + e.getMessage());
             return false;
         }
     }
