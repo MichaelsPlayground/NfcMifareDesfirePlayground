@@ -83,6 +83,15 @@ line 386
                    
 ```
 
+DESFire EV2/3 transaction MAC file:
+
+https://stackoverflow.com/questions/72702235/desfire-transaction-file-creation-parameter-error
+
+https://stackoverflow.com/questions/63138905/computing-a-mac-for-a-desfire-file-read
+
+a lot of revered engineering data: https://github.com/miohtama/desfire
+
+command overview: https://github.com/miohtama/desfire/blob/master/desfire/protocol.py
 
 
 ```plaintext
