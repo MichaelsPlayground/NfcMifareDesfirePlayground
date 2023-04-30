@@ -8,9 +8,7 @@ import static nfcjlib.core.DESFireEV1.validateKey;
 import android.content.Context;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
-import android.nfc.TagLostException;
 import android.nfc.tech.IsoDep;
-import android.nfc.tech.NfcA;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.VibrationEffect;
@@ -28,31 +26,24 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.github.skjolber.desfire.ev1.model.DesfireApplicationKeySettings;
 import com.github.skjolber.desfire.ev1.model.DesfireTag;
-import com.github.skjolber.desfire.ev1.model.command.DefaultIsoDepAdapter;
 import com.github.skjolber.desfire.ev1.model.command.DefaultIsoDepWrapper;
-import com.github.skjolber.desfire.ev1.model.command.IsoDepAdapter;
 import com.github.skjolber.desfire.ev1.model.command.IsoDepWrapper;
 import com.github.skjolber.desfire.ev1.model.file.DesfireFile;
 import com.github.skjolber.desfire.ev1.model.file.DesfireFileCommunicationSettings;
-import com.github.skjolber.desfire.ev1.model.file.RecordDesfireFile;
 import com.github.skjolber.desfire.libfreefare.MifareTag;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.AccessControlException;
-import java.security.Key;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import de.androidcrypto.WriteCyclicFileBuilder;
-import de.androidcrypto.WriteCyclicFileBuilderBuilder;
 import nfcjlib.core.DESFireAdapter;
 import nfcjlib.core.DESFireEV1;
 import nfcjlib.core.KeyType;
@@ -827,7 +818,24 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             public void onClick(View view) {
                 // format the tag
                 // warning the tag will be deleted without any further note
-                // now select the application to delete
+
+                // first select master application and authenticate
+                // select the master file application
+                byte[] responseData = new byte[2];
+                boolean selectMasterApplicationSuccess = selectApplicationDes(readResult, AID_Master, responseData);
+                writeToUiAppend(readResult, "selectMasterApplication result: " + selectMasterApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+
+                // authenticate
+                responseData = new byte[2];
+                // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
+                boolean authenticateMasterSuccess = authenticateApplicationDes(readResult, (byte) 0, new byte[8], false, responseData);
+                writeToUiAppend(readResult, "authenticateMasterApplication result: " + authenticateMasterSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateMasterSuccess) {
+                    writeToUiAppend(readResult, "the authenticationMaster was not successful, aborted");
+                    return;
+                }
+
+                // now we are formatting the card
                 byte formatPiccCommand = (byte) 0xfc;
                 byte[] formatPiccResponse = new byte[0];
                 try {
@@ -3922,14 +3930,14 @@ but now I can work on reading the AES encrypted file
         btn34.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                // write AES encrypted to Standard file, playing with too much data for transceive frame
-                byte[] AES_AID = Utils.hexStringToByteArray("414240");
+                // write AES open to Standard file, playing with too much data for transceive frame
+                byte[] AES_AID = Utils.hexStringToByteArray("A2A1A1");
                 byte applicationMasterKeySettings = (byte) 0x0f; // amks
                 byte[] desKey = new byte[8]; // for the master application
                 byte desKeyNumber0 = (byte) 0; // for the master application
                 byte[] aesKey = new byte[16];
                 byte aesKeyNumberRW = (byte) 0;
-                int aesFileNumberStandard = 7;
+                int aesFileNumberStandard = 1;
                 int aesFileNumberStandardSize = 70;
                 // do not extend the fileSize larger than 28 on AES encrypted data or you need to chunk the sending of data
                 
@@ -3948,6 +3956,15 @@ but now I can work on reading the AES encrypted file
                     return;
                 }
 
+                // create the application
+                responseData = new byte[2];
+                boolean createApplicationSuccess = createApplicationDes(readResult, AES_AID, (byte) 0x83, responseData);
+                writeToUiAppend(readResult, "createApplication result: " + createApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!createApplicationSuccess) {
+                    writeToUiAppend(readResult, "the createApplication was not successful, aborted");
+                    //return;
+                }
+
                 // select the application
                 responseData = new byte[2];
                 boolean selectApplicationSuccess = selectApplicationDes(readResult, AES_AID, responseData);
@@ -3959,11 +3976,11 @@ but now I can work on reading the AES encrypted file
 
                 // create the standard file
                 responseData = new byte[2];
-                boolean createStandardFileAesSuccess = createStandardFileAes(readResult, aesFileNumberStandard, aesFileNumberStandardSize, responseData);
+                boolean createStandardFileAesSuccess = createStandardFileAes(readResult, aesFileNumberStandard, aesFileNumberStandardSize, PayloadBuilder.CommunicationSetting.Plain, responseData);
                 writeToUiAppend(readResult, "createStandardFileAes result: " + createStandardFileAesSuccess + " with response: " + Utils.bytesToHex(responseData));
                 if (!createStandardFileAesSuccess) {
                     writeToUiAppend(readResult, "the createStandardFileAes was not successful, aborted");
-                    return;
+                    //return;
                 }
 
                 // authenticate wit aes key 0
@@ -3975,9 +3992,6 @@ but now I can work on reading the AES encrypted file
                     return;
                 }
 
-                // we do need the Cryp unit
-                Cryp cryp = new Cryp(skeyOwn, ivOwn);
-
                 // write to the standard file
                 responseData = new byte[2];
                 // we need to know how long this Standard File is
@@ -3985,15 +3999,20 @@ but now I can work on reading the AES encrypted file
                 byte[] dataStandard24 = "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8);
                 byte[] dataStandard32 = "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8);
                 byte[] dataStandard28 = "1234567890123456789012345678".getBytes(StandardCharsets.UTF_8);
-                boolean writeEncryptedDataSuccess = writeToStandardFileAesMax70(readResult, (byte) (aesFileNumberStandard & 0xff), dataStandard28, responseData, cryp);
-                writeToUiAppend(readResult, "writeEncryptedData result: " + writeEncryptedDataSuccess + " with response: " + Utils.bytesToHex(responseData));
-                if (!writeEncryptedDataSuccess) {
-                    writeToUiAppend(readResult, "the writeEncryptedData was not successful, aborted");
+                byte[] dataStandard46 = "1234567890123456789012345678901234567890123456".getBytes(StandardCharsets.UTF_8);
+
+                // length 46 gives an sendApdu length of 59 bytes the runs ok
+                // length 48 gives an SendApdu length of 61 bytes that fails with 7E = length error
+
+                byte[] dataStandard48 = "123456789012345678901234567890123456789012345678".getBytes(StandardCharsets.UTF_8);
+                byte[] dataStandard68 = "12345678901234567890123456789012345678901234567890123456789012345678".getBytes(StandardCharsets.UTF_8);
+                byte[] dataStandard70 = "1234567890123456789012345678901234567890123456789012345678901234567890".getBytes(StandardCharsets.UTF_8);
+                boolean writeStandardDataSuccess = writeToStandardFileExt(readResult, aesFileNumberStandard, dataStandard70, responseData);
+                writeToUiAppend(readResult, "writeStandardData result: " + writeStandardDataSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!writeStandardDataSuccess) {
+                    writeToUiAppend(readResult, "the writeData was not successful, aborted");
                     return;
                 }
-
-                // update the IV
-                ivOwn = cryp.getIv();
 
                 // now we are trying to read the written data
                 // authenticate wit aes key 0
@@ -4005,26 +4024,18 @@ but now I can work on reading the AES encrypted file
                     return;
                 }
 
-                // we do need the Cryp unit
-                cryp = new Cryp(skeyOwn, ivOwn);
-
                 // read from the standard file
-
-                // read the standard file
                 responseData = new byte[2];
                 // we need to know how long this Standard File is
                 //byte[] readEncryptedData = readFromStandardFileAesMax70(readResult, aesFileNumberStandard, aesFileNumberStandardSize, responseData, cryp);
                 // the maximum for reading is 44, using 45 given an 4f at the read end to read the next frame
 
-                byte[] readEncryptedData = readFromStandardFileAesMax70(readResult, aesFileNumberStandard, 44, responseData, cryp);
+                byte[] readData = readFromStandardFileExt(readResult, (byte) aesFileNumberStandard, aesFileNumberStandardSize, responseData);
 
-                // update the IV
-                ivOwn = cryp.getIv();
-
-                writeToUiAppend(readResult, printData("readEncryptedData", readEncryptedData));
+                writeToUiAppend(readResult, printData("readData", readData));
                 writeToUiAppend(readResult, printData("responseData", responseData));
-                if (readEncryptedData != null) {
-                    writeToUiAppend(readResult, new String(readEncryptedData, StandardCharsets.UTF_8));
+                if (readData != null) {
+                    writeToUiAppend(readResult, new String(readData, StandardCharsets.UTF_8));
                 } else {
                     writeToUiAppend(readResult, "no data available");
                 }
@@ -4561,6 +4572,7 @@ but now I can work on reading the AES encrypted file
         if (logTextView == null) return false;
         if (applicationIdentifier == null) return false;
         if (applicationIdentifier.length != 3) return false;
+        if ((numberOfKeys < 1) || (numberOfKeys > 15)) return false;
 
         // create an application
         writeToUiAppend(logTextView, "create the application " + Utils.bytesToHex(applicationIdentifier));
@@ -4846,11 +4858,11 @@ but now I can work on reading the AES encrypted file
         }
     }
 
-    private boolean createStandardFileAes(TextView logTextView, int fileNumber, int fileSize, byte[] response) {
+    private boolean createStandardFileAes(TextView logTextView, int fileNumber, int fileSize, PayloadBuilder.CommunicationSetting communicationSetting , byte[] response) {
         // we create a standard file within the selected application
         byte createStandardFileCommand = (byte) 0xcd;
         PayloadBuilder pb = new PayloadBuilder();
-        byte[] createStandardFileParameters = pb.createStandardFileMax70(fileNumber, PayloadBuilder.CommunicationSetting.Encrypted,
+        byte[] createStandardFileParameters = pb.createStandardFileMax70(fileNumber, communicationSetting,
                 0, 0, 1, 2, fileSize);
 
         // DO NOT EXTEND THE FILESIZE > 28 bytes, that will crash the write method because the CRC is appended
@@ -4902,6 +4914,38 @@ but now I can work on reading the AES encrypted file
         writeToUiAppend(logTextView, printData("readStandardFileResponse", readStandardFileResponse));
         System.arraycopy(returnStatusBytes(readStandardFileResponse), 0, response, 0, 2);
         return Arrays.copyOf(readStandardFileResponse, readStandardFileResponse.length - 2);
+    }
+
+    private byte[] readFromStandardFileExt(TextView logTextView, int fileNumber, int fileLength, byte[] response) {
+        // we read from a standard file within the selected application
+
+        // now read from file
+        byte readStandardFileCommand = (byte) 0xbd;
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] readStandardFileParameters = pb.readFromStandardFile(fileNumber, 0, fileLength);
+        writeToUiAppend(readResult, printData("readStandardFileParameters", readStandardFileParameters));
+
+        // should I leave out the last/trailing 00 from the command for transmit chain ?
+        //readStandardFileParameters = Arrays.copyOf(readStandardFileParameters, readStandardFileParameters.length - 1);
+        // writeStandardFileParameters length: 19 data: 07000000200000546865206c617a7920646f67
+        byte[] readStandardFileResponse = new byte[0];
+        try {
+            byte[] fullWrappedApdu = wrapMessage(readStandardFileCommand, readStandardFileParameters);
+
+            // at this point I using a special send command to allow framing
+            readStandardFileResponse = transmitChain(fullWrappedApdu);
+
+            //readStandardFileResponse = isoDep.transceive(f);
+            writeToUiAppend(logTextView, printData("send APDU", wrapMessage(readStandardFileCommand, readStandardFileParameters)));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
+            return null;
+        }
+        writeToUiAppend(logTextView, printData("readStandardFileResponse", readStandardFileResponse));
+        System.arraycopy(new byte[]{(byte) 0x91, (byte) 0x00}, 0, response, 0, 2);
+        //return Arrays.copyOf(readStandardFileResponse, readStandardFileResponse.length - 2);
+        return Arrays.copyOf(readStandardFileResponse, fileLength);
     }
 
     private byte[] readFromStandardFileAes(TextView logTextView, byte fileNumber, byte[] response, Cryp cryp, int lengthInt) {
@@ -4996,6 +5040,45 @@ but now I can work on reading the AES encrypted file
         try {
             writeStandardFileResponse = isoDep.transceive(wrapMessage(writeStandardFileCommand, writeStandardFileParameters));
             writeToUiAppend(logTextView, printData("send APDU", wrapMessage(writeStandardFileCommand, writeStandardFileParameters)));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(logTextView, printData("writeStandardFileResponse", writeStandardFileResponse));
+        System.arraycopy(returnStatusBytes(writeStandardFileResponse), 0, response, 0, 2);
+        if (checkResponse(writeStandardFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean writeToStandardFileExt(TextView logTextView, int fileNumber, byte[] data, byte[] response) {
+        // some sanity checks to avoid any issues
+        if (fileNumber < (byte) 0x00) return false;
+        if (fileNumber > (byte) 0x0A) return false;
+        if (data == null) return false;
+        if (data.length == 0) return false;
+        if (data.length > 70) return false;
+
+        // write to file
+        byte writeStandardFileCommand = (byte) 0x3d;
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] writeStandardFileParameters = pb.writeToStandardFileMax70(fileNumber, data);
+        writeToUiAppend(logTextView, printData("writeStandardFileParameters", writeStandardFileParameters));
+        // writeStandardFileParameters length: 19 data: 07000000200000546865206c617a7920646f67
+        byte[] writeStandardFileResponse = new byte[0];
+        try {
+            byte[] fullWrappedApdu = wrapMessage(writeStandardFileCommand, writeStandardFileParameters);
+            // should I leave out the last/trailing 00 from the command for transmit chain ?, yes !
+            fullWrappedApdu = Arrays.copyOf(fullWrappedApdu, fullWrappedApdu.length - 1);
+
+            // at this point I using a special send command to allow framing
+            writeStandardFileResponse = transmitChain(fullWrappedApdu);
+
+            //writeStandardFileResponse = isoDep.transceive(wrapMessage(writeStandardFileCommand, writeStandardFileParameters));
+            writeToUiAppend(logTextView, printData("send APDU", fullWrappedApdu));
         } catch (Exception e) {
             //throw new RuntimeException(e);
             writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
@@ -6490,6 +6573,155 @@ writeFileResponse length: 2 data: 917e length error
 
         return stream.toByteArray();
     }
+
+    /**
+     * section for efficient writing of data to the card with a length of more than frame size
+     * Usually we can send unencrypted data of about 45 bytes length in one frame
+     * If using AES encryption it is about a maximum of 24 bytes to send in one frame
+     * The following code is taken from DESFireAdapter.java
+     */
+
+    // some constants
+    //public static final byte OPERATION_OK = (byte)0x00;
+    //public static final byte ADDITIONAL_FRAME = (byte)0xAF;
+    public static final byte STATUS_OK = (byte) 0x91;
+
+    public static final int MAX_CAPDU_SIZE = 55;
+    public static final int MAX_RAPDU_SIZE = 60;
+    public boolean print = true;
+    /**
+     * Send compressed command message
+	 *
+     * @param adpu
+	 * @return
+     * @throws Exception
+	 */
+
+    // this is called DESFireEV1 byte[] responseAPDU = adapter.transmitChain(fullApdu);
+    public byte[] transmitChain(byte[] adpu) throws Exception {
+        return receiveResponseChain(sendRequestChain(adpu));
+    }
+
+    public byte[] receiveResponseChain(byte[] response) throws IOException, Exception {
+
+        if(response[response.length - 2] == STATUS_OK && response[response.length - 1] == OPERATION_OK) {
+            return response;
+        }
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        do {
+            if (response[response.length - 2] != STATUS_OK) {
+                throw new Exception("Invalid response " + String.format("%02x", response[response.length - 2] & 0xff));
+            }
+
+            output.write(response, 0, response.length - 2);
+
+            byte status = response[response.length - 1];
+            if (status == OPERATION_OK) {
+                return output.toByteArray();
+            } else if (status != ADDITIONAL_FRAME) {
+                throw new Exception("PICC error code while reading response: " + Integer.toHexString(status & 0xFF));
+            }
+
+            response = transmit(wrapMessage(ADDITIONAL_FRAME));
+        } while(true);
+    }
+
+    public byte[] sendRequestChain(byte[] apdu) throws Exception {
+        System.out.println("*** sendRequestChain apdu: " + Utils.bytesToHex(apdu));
+        if(apdu.length <= MAX_CAPDU_SIZE) {
+            return transmit(apdu);
+        }
+        int offset = 5; // data area of apdu
+
+        byte nextCommand =  apdu[1];
+        while(true) {
+            int nextLength = Math.min(MAX_CAPDU_SIZE - 1, apdu.length - offset);
+
+            byte[] request = wrapMessage(nextCommand, apdu, offset, nextLength);
+
+            byte[] response = transmit(request);
+            System.out.println("*** sendRequestChain response: " + Utils.bytesToHex(response));
+            if (response[response.length - 2] != STATUS_OK) {
+                throw new Exception("Invalid response " + String.format("%02x", response[response.length - 2] & 0xff));
+            }
+
+            offset += nextLength;
+            if(offset == apdu.length) {
+                return response;
+            }
+
+            if(response.length != 2) {
+                throw new IllegalArgumentException("Expected empty response payload while transmitting request");
+            }
+            byte status = response[response.length - 1];
+            if (status != ADDITIONAL_FRAME) {
+                throw new Exception("PICC error code: " + Integer.toHexString(status & 0xFF));
+            }
+            nextCommand = ADDITIONAL_FRAME;
+        }
+
+    }
+
+    public static byte[] wrapMessage (byte command) throws Exception {
+        return new byte[]{(byte) 0x90, command, 0x00, 0x00, 0x00};
+    }
+
+    public static byte[] wrapMessage (byte command, byte[] parameters, int offset, int length) throws Exception {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+
+        stream.write((byte) 0x90);
+        stream.write(command);
+        stream.write((byte) 0x00);
+        stream.write((byte) 0x00);
+        if (parameters != null && length > 0) {
+            // actually no length if empty length
+            stream.write(length);
+            stream.write(parameters, offset, length);
+        }
+        stream.write((byte) 0x00);
+
+        return stream.toByteArray();
+    }
+
+    /**
+     * Send a command to the card and return the response.
+     *
+     * @param command	the command
+     * @return			the PICC response
+     * @throws IOException
+     */
+    public byte[] transmit(byte[] command) throws IOException {
+
+        if(print) {
+            //Log.d(TAG, "===> " + getHexString(command, true) + " (" + command.length + ")");
+            Log.d(TAG, "===> " + getHexString(command, true) + " (" + command.length + ")");
+        }
+
+        byte[] response = isoDep.transceive(command);
+
+        if(print) {
+            Log.d(TAG, "<=== " + getHexString(response, true) + " (" + command.length + ")");
+        }
+
+        return response;
+    }
+
+    public static String getHexString(byte[] a, boolean space) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : a) {
+            sb.append(String.format("%02x", b & 0xff));
+            if(space) {
+                sb.append(' ');
+            }
+        }
+        return sb.toString().trim().toUpperCase();
+    }
+
+    /**
+     * section for efficient writing of data to the card with a length of more than frame size END
+     */
 
     /***
      * Given a byte array, convert it to a hexadecimal representation.

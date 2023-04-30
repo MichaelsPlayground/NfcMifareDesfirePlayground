@@ -103,6 +103,24 @@ public class PayloadBuilder {
         return payload;
     }
 
+    public byte[] writeToStandardFileMax70(int fileNumber, byte[] data) {
+        // sanity checks
+        if ((fileNumber < 0) || (fileNumber > 15)) return null;
+        if (data == null) return null;
+        if (data.length > 70) return null; // avoid framing
+
+        // build
+        byte[] offset = new byte[]{(byte) 0x00, (byte) 0xf00, (byte) 0x00}; // write at the beginning, fixed
+        byte[] lengthOfData = intTo3ByteArrayLsb(data.length);
+        byte[] payload = new byte[7 + data.length]; // 7 + length of data
+        payload[0] = (byte) (fileNumber & 0xff); // fileNumber
+        System.arraycopy(offset, 0, payload, 1, 3);
+        System.arraycopy(lengthOfData, 0, payload, 4, 3);
+        System.arraycopy(data, 0, payload, 7, data.length);
+        return payload;
+    }
+
+
     public byte[] readFromStandardFile(int fileNumber, int offsetToRead, int sizeToRead) {
         // sanity checks
         if ((fileNumber < 0) || (fileNumber > 15)) return null;
@@ -111,7 +129,6 @@ public class PayloadBuilder {
 
         // build
         byte[] payload = new byte[7];
-        byte fileNumberByte = (byte) (fileNumber & 0xff);
         byte[] offset = intTo3ByteArrayLsb(offsetToRead);
         byte[] lengthOfData = intTo3ByteArrayLsb(sizeToRead);
         payload[0] = (byte) (fileNumber & 0xff); // fileNumber
