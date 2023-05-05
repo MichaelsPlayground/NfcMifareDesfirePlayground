@@ -57,7 +57,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private final String TAG = "Main";
 
     Button btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13, btn14, btn15, btn16, btn17, btn18, btn19, btn20, btn21, btn22, btn23;
-    Button btn24, btn25, btn26, btn27, btn28, btn29, btn32, btn33, btn34, btn35; // missing 30 + 31 for value files
+    Button btn24, btn25, btn26, btn27, btn28, btn29, btn32, btn33, btn34, btn35, btn36, btn37; // missing 30 + 31 for value files
     EditText tagId, dataToWrite, readResult;
     private NfcAdapter mNfcAdapter;
     byte[] tagIdByte;
@@ -193,6 +193,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         btn33 = findViewById(R.id.btn33);
         btn34 = findViewById(R.id.btn34);
         btn35 = findViewById(R.id.btn35);
+        btn36 = findViewById(R.id.btn36);
+        btn37 = findViewById(R.id.btn37);
 
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
@@ -4090,6 +4092,66 @@ but now I can work on reading the AES encrypted file
 
             }
         });
+
+        btn36.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // analyze key settings
+                byte[] AES_AID = Utils.hexStringToByteArray("A2A1A1");
+                byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                byte[] desKey = new byte[8]; // for the master application
+                byte desKeyNumber0 = (byte) 0; // for the master application
+                byte[] aesKey = new byte[16];
+                byte aesKeyNumberRW = (byte) 0;
+                int aesFileNumberStandard = 1;
+                int aesFileNumberStandardSize = 70;
+
+                // select the master file application
+                byte[] responseData = new byte[2];
+                boolean selectMasterApplicationSuccess = selectApplicationDes(readResult, AID_Master, responseData);
+                writeToUiAppend(readResult, "selectMasterApplication result: " + selectMasterApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+
+                // authenticate
+                responseData = new byte[2];
+                // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
+                boolean authenticateMasterSuccess = authenticateApplicationDes(readResult, desKeyNumber0, desKey, false, responseData);
+                writeToUiAppend(readResult, "authenticateMasterApplication result: " + authenticateMasterSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!authenticateMasterSuccess) {
+                    writeToUiAppend(readResult, "the authenticationMaster was not successful, aborted");
+                    return;
+                }
+
+                // create the application
+                responseData = new byte[2];
+                boolean createApplicationSuccess = createApplicationDes(readResult, AES_AID, (byte) 0x83, responseData);
+                writeToUiAppend(readResult, "createApplication result: " + createApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!createApplicationSuccess) {
+                    writeToUiAppend(readResult, "the createApplication was not successful, aborted");
+                    //return;
+                }
+
+                // select the application
+                responseData = new byte[2];
+                boolean selectApplicationSuccess = selectApplicationDes(readResult, AES_AID, responseData);
+                writeToUiAppend(readResult, "selectApplication result: " + selectApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+                if (!selectApplicationSuccess) {
+                    writeToUiAppend(readResult, "the selectApplication was not successful, aborted");
+                    return;
+                }
+
+                // get the application key setting
+                responseData = new byte[2];
+                byte[] getApplicationKeySetting = getKeySettings(readResult, responseData);
+                writeToUiAppend(readResult, "getApplicationKeySetting result: " + Utils.bytesToHex(getApplicationKeySetting) + " with response: " + Utils.bytesToHex(responseData));
+                // 0f83 9100
+                byte[] getApplicationKeySettingData = Arrays.copyOf(getApplicationKeySetting, getApplicationKeySetting.length - 2);
+                // uses DesfireApplicationKeySettings in com.github.skjolber.desfire.ev1.model
+                DesfireApplicationKeySettings daks = new DesfireApplicationKeySettings(getApplicationKeySettingData);
+                writeToUiAppend(readResult, "DAKS: " + daks.toString());
+
+
+            }
+        });
     }
 
 
@@ -6446,16 +6508,6 @@ writeFileResponse length: 2 data: 917e length error
                     writeToUiAppend(readResult, versionInfo.dump());
                 }
 
-                byte[] responseGetSignature = new byte[0];
-                try {
-                    byte readSignature = (byte) 0x3c;
-                    byte[] wrappedApduGetSignature = wrapMessage(readSignature, null);
-                    responseGetSignature = isoDep.transceive(wrappedApduGetSignature);
-                } catch (Exception e) {
-                    //throw new RuntimeException(e);
-                    writeToUiAppend(readResult, "Exception: " + e.getMessage());
-                }
-                writeToUiAppend(readResult, printData("signature from card", responseGetSignature));
 
 /*
                 String getChallengeCommand2 = "90af000000";

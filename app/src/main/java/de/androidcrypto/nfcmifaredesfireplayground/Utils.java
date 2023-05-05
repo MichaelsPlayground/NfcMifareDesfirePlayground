@@ -47,6 +47,14 @@ public class Utils {
         return result.toString();
     }
 
+    public static String bytesToHexNpe(byte[] bytes) {
+        if (bytes == null) return "";
+        StringBuffer result = new StringBuffer();
+        for (byte b : bytes)
+            result.append(Integer.toString((b & 0xff) + 0x100, 16).substring(1));
+        return result.toString();
+    }
+
     public static byte[] hexStringToByteArray(String s) {
         int len = s.length();
         byte[] data = new byte[len / 2];
