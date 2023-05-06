@@ -58,6 +58,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     Button btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13, btn14, btn15, btn16, btn17, btn18, btn19, btn20, btn21, btn22, btn23;
     Button btn24, btn25, btn26, btn27, btn28, btn29, btn32, btn33, btn34, btn35, btn36, btn37; // missing 30 + 31 for value files
+    Button btn38, btn39;
     EditText tagId, dataToWrite, readResult;
     private NfcAdapter mNfcAdapter;
     byte[] tagIdByte;
@@ -195,6 +196,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         btn35 = findViewById(R.id.btn35);
         btn36 = findViewById(R.id.btn36);
         btn37 = findViewById(R.id.btn37);
+        btn38 = findViewById(R.id.btn38);
+        btn39 = findViewById(R.id.btn39);
 
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
@@ -4148,6 +4151,23 @@ but now I can work on reading the AES encrypted file
                 // uses DesfireApplicationKeySettings in com.github.skjolber.desfire.ev1.model
                 DesfireApplicationKeySettings daks = new DesfireApplicationKeySettings(getApplicationKeySettingData);
                 writeToUiAppend(readResult, "DAKS: " + daks.toString());
+
+
+            }
+        });
+
+        btn38.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // set the AES keys for proximity check
+                // works on EV2 and EV3 only !
+
+                // see http://www.domcc3.com/assets/pdfs/Celiano_overclocking-proximity-checks.pdf
+
+
+
+
+
 
 
             }
