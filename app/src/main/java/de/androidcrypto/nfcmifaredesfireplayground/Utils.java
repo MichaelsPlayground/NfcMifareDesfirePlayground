@@ -41,6 +41,7 @@ public class Utils {
     }
 
     public static String bytesToHex(byte[] bytes) {
+        if (bytes == null) return "";
         StringBuffer result = new StringBuffer();
         for (byte b : bytes)
             result.append(Integer.toString((b & 0xff) + 0x100, 16).substring(1));
