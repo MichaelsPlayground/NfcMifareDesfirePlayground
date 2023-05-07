@@ -320,7 +320,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="8dp"
                 android:layout_weight="1"
-                android:text="AES comm 2" />
+                android:text="DF AES comm 2" />
         </LinearLayout>
 
         <LinearLayout
