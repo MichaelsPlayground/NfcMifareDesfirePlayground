@@ -4163,9 +4163,106 @@ but now I can work on reading the AES encrypted file
                 // works on EV2 and EV3 only !
 
                 // see http://www.domcc3.com/assets/pdfs/Celiano_overclocking-proximity-checks.pdf
+                // as we need AES encryption we use the Desfire methods
+
+                // first we setup a des-key secured application
+                byte[] responseData = new byte[2];
+
+                DESFireEV1 desfire = new DESFireEV1();
+                //desfire.setAdapter(defaultIsoDepAdapter);
+                desfire.setAdapter(desFireAdapter);
+                PayloadBuilder pb = new PayloadBuilder();
+                try {
+
+                    byte[] AES_AID = Utils.hexStringToByteArray("414240");
+                    byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                    byte[] desKey = new byte[8]; // for the master application
+                    byte[] aesKey = new byte[16];
+
+                    // complete reading
+                    boolean dfSelectM = desfire.selectApplication(AID_Master);
+                    writeToUiAppend(readResult, "dfSelectM result: " + dfSelectM);
+
+                    boolean dfAuthM = desfire.authenticate(desKey, (byte) 0, KeyType.DES);
+                    writeToUiAppend(readResult, "dfAuthMRead result: " + dfAuthM);
+
+/*
+set the VCConfigurationKey using the DESFire’s ChangeKey command. Next, I performed an AES authentication
+to the DESFire using the VCConfigurationKey and used the ChangeKey command to set the VCProximityKey.
+After VCProximityKey had been explicitly set, the key was enabled and I was able to perform the
+Proximity Check using either the ACR122 or the Proxmark 3.
+ */
+
+                    byte[] AES_KEY_VC2X_ZERO = Utils.hexStringToByteArray("00000000000000000000000000000000");
+                    byte[] AES_KEY_VC2X = Utils.hexStringToByteArray("BB000000000000000000000000000000");
+
+                    // get key settings for key 0x20
+                    DesfireApplicationKeySettings keySettings00 = desfire.getKeySettings();
+                    writeToUiAppend(readResult, "keySettings00: " + keySettings00.toString());
+
+                    // change key 20
+                    // boolean changeKey(byte keyNo, KeyType newType, byte[] newKey, byte[] oldKey)
+                    byte key20 = (byte) 0x20;
+                    boolean changeKey20Result = desfire.changeKey(key20, KeyType.AES, AES_KEY_VC2X, AES_KEY_VC2X_ZERO);
+                    writeToUiAppend(readResult, "changeKey20Result: " + changeKey20Result);
+                    // change key 21
+                    // boolean changeKey(byte keyNo, KeyType newType, byte[] newKey, byte[] oldKey)
+                    byte key21 = (byte) 0x21;
+                    boolean changeKey21Result = desfire.changeKey(key21, KeyType.AES, AES_KEY_VC2X, AES_KEY_VC2X_ZERO);
+                    writeToUiAppend(readResult, "changeKey21Result: " + changeKey21Result);
+
+/*
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Create application");
+
+                    boolean dfCreateApplication = desfire.createApplication(AES_AID, applicationMasterKeySettings, KeyType.AES, (byte) 3);
+                    writeToUiAppend(readResult, "dfCreateApplication result: " + dfCreateApplication);
+
+                    boolean dfSelectApplication = desfire.selectApplication(AES_AID);
+                    writeToUiAppend(readResult, "dfSelectApplication result: " + dfSelectApplication);
+
+                    boolean dfAuthApplication = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthApplication result: " + dfAuthApplication);
+
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Standard file");
+
+                    byte[] payloadStandardFile = pb.createStandardFile(desFileNumberStandard, PayloadBuilder.CommunicationSetting.Encrypted,
+                            0, 0, 0, 0, desFileNumberStandardSize);
+                    boolean dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
+                    writeToUiAppend(readResult, "dfCreateStandardFile result: " + dfCreateStandardFile);
 
 
+                    // auth for writing
+                    boolean dfAuthS1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthS1 result: " + dfAuthS1);
 
+                    String dataStandardString = "*** Standard file data ***";
+                    String dataStandard24String = "abcdefghijklmnopqrstuvwx";
+                    String dataStandard24String2 = "123456789012345678901234";
+                    //String dataStandard32String = "12345678901234567890123456789012";
+                    byte[] payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard, dataStandard24String);
+                    boolean dfWriteStandard = desfire.writeData(payloadWriteStandardData);
+                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
+
+                    // auth for reading skipped
+
+                    byte[] readStandard = desfire.readData((byte) (desFileNumberStandard & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    } else {
+                        writeToUiAppend(readResult, "no data available");
+                    }
+*/
+
+                } catch (IOException e) {
+                    writeToUiAppend(readResult, "IOEx Error with DESFireEV1 + " + e.getMessage());
+                } catch (Exception e) {
+                    writeToUiAppend(readResult, "Ex Error with DESFireEV1 + " + e.getMessage());
+                }
 
 
 
