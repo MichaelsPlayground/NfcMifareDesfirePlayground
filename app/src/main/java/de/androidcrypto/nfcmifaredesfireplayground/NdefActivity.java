@@ -210,7 +210,8 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     byte numberOfKeys = (byte) 0x21; // number of key: 1, TDES keys
                     //byte COMMUNICATION_SETTINGS = (byte) 0x0f;
                     byte FILE_ID_01 = (byte) 0x01;
-                    byte[] ISO_FILE_ID_01 = Utils.hexStringToByteArray("10E1");
+                    byte[] ISO_FILE_ID_01 = Utils.hexStringToByteArray("03E1");
+                    int FILE_01_SIZE = 15;
                     byte FILE_ID_02 = (byte) 0x02;
                     byte[] ISO_DF = Utils.hexStringToByteArray("D2760000850101"); // this is the AID for NDEF
                     writeToUiAppend(readResult, "");
@@ -245,7 +246,7 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     writeToUiAppend(readResult, "4. MIFARE DESFire CreateStdDataFile with FileNo equal to 01h");
                     responseData = new byte[2];
                     boolean createStandardFileIsoSuccess = createStandardFileIso(readResult, FILE_ID_01, ISO_FILE_ID_01, PayloadBuilder.CommunicationSetting.Plain,
-                            14, 14, 14, 14, 14, responseData);
+                            14, 14, 14, 14, FILE_01_SIZE, responseData);
                     writeToUiAppend(readResult, "createStandardFileIso result: " + createStandardFileIsoSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!createStandardFileIsoSuccess) {
                         writeToUiAppend(readResult, "the createStandardFileIso was not successful, aborted");
