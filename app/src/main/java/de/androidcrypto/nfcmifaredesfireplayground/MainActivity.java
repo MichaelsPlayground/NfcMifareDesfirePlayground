@@ -4269,6 +4269,332 @@ Proximity Check using either the ACR122 or the Proxmark 3.
 
             }
         });
+
+        btn39.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // format the tag for usage as NDEF (Tag 4 type) tag
+                // see document MIFARE DESFire as Type 4 Tag AN11004.pdf
+
+                // 1. select master application and authenticate
+
+                // first we setup a des-key secured application
+                byte[] responseData = new byte[2];
+
+                PayloadBuilder pb = new PayloadBuilder();
+                try {
+
+                    byte[] AES_AID = Utils.hexStringToByteArray("414240");
+                    byte applicationMasterKeySettings = (byte) 0x0f; // amks
+                    byte DES_MASTER_KEY_NUMBER = (byte) 0x00;
+                    byte[] DES_MASTER_KEY = new byte[8]; // for the master application
+                    byte[] aesKey = new byte[16];
+                    byte desKeyNumberRW = (byte) 0;
+                    int desFileNumberStandard = 1;
+                    int desFileNumberStandard32 = 11;
+                    int desFileNumberStandardSize = 32;
+                    int desFileNumberValue = 2;
+                    int desFileNumberLinear = 3;
+                    int desFileLinearSize = 32;
+                    int desFileLinearRecords = 5;
+                    int desFileNumberCyclic = 4;
+                    int desFileCyclicSize = 32;
+                    int desFileCyclicRecords = 5;
+
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Format the tag as Tag 4 type (NDEF)");
+
+                    // select the master file application
+
+                    boolean selectMasterApplicationSuccess = selectApplicationDes(readResult, AID_Master, responseData);
+                    writeToUiAppend(readResult, "selectMasterApplication result: " + selectMasterApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+
+                    // authenticate
+                    responseData = new byte[2];
+                    // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
+                    boolean authenticateMasterSuccess = authenticateApplicationDes(readResult, DES_MASTER_KEY_NUMBER, DES_MASTER_KEY, false, responseData);
+                    writeToUiAppend(readResult, "authenticateMasterApplication result: " + authenticateMasterSuccess + " with response: " + Utils.bytesToHex(responseData));
+                    if (!authenticateMasterSuccess) {
+                        writeToUiAppend(readResult, "the authenticationMaster was not successful, aborted");
+                        return;
+                    }
+
+                    // at this point the PICC needs these environments:
+                    // create an application with this AII: 0xEEEE10
+                    byte[] AID_NDEF = Utils.hexStringToByteArray("EEEE10");
+                    byte APPLICATION_KEY_SETTINGS = (byte) 0x0F;
+                    byte FILE_ID = (byte) 0x01;
+                    byte[] ISO_FILE_ID = Utils.hexStringToByteArray("E110");
+                    byte[] ISO_DF = Utils.hexStringToByteArray("D2760000850101"); // this is the AID for NDEF
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Create application");
+
+
+                    // create the application
+                    responseData = new byte[2];
+                    boolean createApplicationSuccess = createApplicationIsoDes(readResult, AID_NDEF, APPLICATION_KEY_SETTINGS, (byte) 0x01, ISO_FILE_ID, ISO_DF,  responseData);
+                    writeToUiAppend(readResult, "createApplicationIso result: " + createApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+                    if (!createApplicationSuccess) {
+                        writeToUiAppend(readResult, "the createApplicationIso was not successful, aborted");
+                        //return;
+                    }
+
+                    // select the application
+                    responseData = new byte[2];
+                    byte[] AID_NDEF2 = Utils.hexStringToByteArray("000001");
+                    boolean selectApplicationSuccess = selectApplicationDes(readResult, AID_NDEF2, responseData);
+                    writeToUiAppend(readResult, "selectApplication result: " + selectApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
+                    if (!selectApplicationSuccess) {
+                        writeToUiAppend(readResult, "the selectApplication was not successful, aborted");
+                        return;
+                    }
+
+                    // create a standard file
+                    responseData = new byte[2];
+                    boolean createStandardFileIsoSuccess = createStandardFileIso(readResult, FILE_ID, responseData);
+                    writeToUiAppend(readResult, "createStandardFileIso result: " + createStandardFileIsoSuccess + " with response: " + Utils.bytesToHex(responseData));
+                    if (!selectApplicationSuccess) {
+                        writeToUiAppend(readResult, "the createStandardFileIso was not successful, aborted");
+                        return;
+                    }
+
+
+
+
+                    /*
+
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Create application");
+
+                    boolean dfCreateApplication = desfire.createApplication(AES_AID, applicationMasterKeySettings, KeyType.AES, (byte) 3);
+                    writeToUiAppend(readResult, "dfCreateApplication result: " + dfCreateApplication);
+
+                    boolean dfSelectApplication = desfire.selectApplication(AES_AID);
+                    writeToUiAppend(readResult, "dfSelectApplication result: " + dfSelectApplication);
+
+                    boolean dfAuthApplication = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthApplication result: " + dfAuthApplication);
+
+                    // Standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Standard file");
+
+                    byte[] payloadStandardFile = pb.createStandardFile(desFileNumberStandard, PayloadBuilder.CommunicationSetting.Encrypted,
+                            0, 0, 0, 0, desFileNumberStandardSize);
+                    boolean dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
+                    writeToUiAppend(readResult, "dfCreateStandardFile result: " + dfCreateStandardFile);
+
+                     */
+/*
+MACed seems not to work
+                    writeToUiAppend(readResult, "create a Standard file with full 32 bte content");
+                    byte[]  payloadStandardFile32 = pb.createStandardFile(desFileNumberStandard32, PayloadBuilder.CommunicationSetting.MACed,
+                            0, 0, 0, 0, desFileNumberStandardSize);
+                    boolean dfCreateStandardFile32 = desfire.createStdDataFile(payloadStandardFile32);
+                    writeToUiAppend(readResult, "dfCreateStandardFile32 result: " + dfCreateStandardFile32);
+*/
+
+                    /*
+                    // auth for writing
+                    boolean dfAuthS1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthS1 result: " + dfAuthS1);
+
+                    String dataStandardString = "*** Standard file data ***";
+                    String dataStandard24String = "abcdefghijklmnopqrstuvwx";
+                    String dataStandard24String2 = "123456789012345678901234";
+                    //String dataStandard32String = "12345678901234567890123456789012";
+                    byte[] payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard, dataStandard24String);
+                    boolean dfWriteStandard = desfire.writeData(payloadWriteStandardData);
+                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
+
+                     */
+/*
+                    // write a full 32 bytes data
+                    writeToUiAppend(readResult, "write Standard file with full 32 bytes content");
+                    String data32String = "12345678901234567890123456789012";
+                    payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard32, data32String);
+                    dfWriteStandard = desfire.writeData(payloadWriteStandardData);
+                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
+*/
+                    /*
+                    // auth for reading skipped
+
+                    byte[] readStandard = desfire.readData((byte) (desFileNumberStandard & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    } else {
+                        writeToUiAppend(readResult, "no data available");
+                    }
+
+                     */
+
+/*
+Actual app status:
+In DESFireEV1 some read & write methods have hardcoded ENCIPHERED flags instead of Plain/MACed or ENCIPHERED
+second: the calculated CMAC does not match the expected one
+but now I can work on reading the AES encrypted file
+
+
+ */
+
+
+
+/*
+                    writeToUiAppend(readResult, "read Standard file with full 32 bytes content");
+                    readStandard = desfire.readData((byte) (desFileNumberStandard32 & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
+                    writeToUiAppend(readResult, printData("readStandard", readStandard));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
+                    } else {
+                        writeToUiAppend(readResult, "no data available");
+                    }
+*/
+/*
+                    // value file
+                    // linear records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Value file");
+
+                    byte[] payloadValueFile = pb.createValueFile(desFileNumberValue, PayloadBuilder.CommunicationSetting.Encrypted,
+                            0, 0, 0, 0,
+                            0, 100, 49);
+                    boolean dfCreateValueFile = desfire.createValueFile(payloadValueFile);
+                    writeToUiAppend(readResult, "dfCreateValueFile result: " + dfCreateValueFile);
+
+                    // read the value
+                    int readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // credit by 11
+                    //byte[] payloadCreditData = pb.creditValueFile(desFileNumberValue, 11);
+                    boolean dfCreditValue = desfire.credit((byte) (desFileNumberValue & 0xff), 11);
+                    writeToUiAppend(readResult, "dfCreditValue result: " + dfCreditValue);
+
+                    // don't forget to commit
+                    boolean dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    // read the value
+                    readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // debit by 7
+                    //byte[] payloadDebitData = pb.debitValueFile(desFileNumberValue, 7);
+                    boolean dfDebitValue = desfire.debit((byte) (desFileNumberValue & 0xff), 7);
+                    writeToUiAppend(readResult, "dfDebitValue result: " + dfDebitValue);
+
+                    // don't forget to commit
+                    dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+
+                    // read the value
+                    readValue = desfire.getValue((byte) (desFileNumberValue & 0xff));
+                    writeToUiAppend(readResult, "getValue: " + readValue);
+
+                    // linear records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Linear Records file");
+
+                    byte[] payloadLinearRecordsFile = pb.createLinearRecordsFile(desFileNumberLinear, PayloadBuilder.CommunicationSetting.Encrypted,
+                            0, 0, 0, 0, desFileLinearSize, desFileLinearRecords);
+                    writeToUiAppend(readResult, printData("payloadLinearRecordsFile", payloadLinearRecordsFile));
+                    boolean dfCreateLinearRecordsFile = desfire.createLinearRecordFile(payloadLinearRecordsFile);
+                    writeToUiAppend(readResult, "dfCreateLinearRecordsFile result: " + dfCreateLinearRecordsFile);
+
+                    // auth for writing
+                    boolean dfAuthL1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthL1 result: " + dfAuthL1);
+
+                    try {
+
+                        byte[] payloadWriteLinearData = pb.writeToLinearRecordsFile(desFileNumberLinear, "Entry from " + Utils.getTimestamp());
+                        boolean dfWriteLinear = desfire.writeRecord(payloadWriteLinearData);
+                        writeToUiAppend(readResult, "dfWriteLinear result: " + dfWriteLinear);
+
+                        // don't forget to commit
+                        dfCommit = desfire.commitTransaction();
+                        writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+                    } catch (Exception e) {
+                        writeToUiAppend(readResult, "We received an error during writing the data to the Linear Records file");
+                        writeToUiAppend(readResult, "maybe the file is full; consider to clear the files");
+                        writeToUiAppend(readResult, e.getMessage());
+                    }
+
+ */
+/*
+                    for (int i = 0; i < desFileLinearRecords; i++) {
+                        writeToUiAppend(readResult, "linear records file record number: " + i);
+                        byte[] readLinearRecordsFile = desfire.readRecords((byte) (desFileNumberLinear & 0xff), i, 1); // means from record 0 to 4, reading 1 record per read
+                        writeToUiAppend(readResult, printData("readLinearRecordsFile", readLinearRecordsFile));
+                        if (readStandard != null) {
+                            writeToUiAppend(readResult, new String(readLinearRecordsFile, StandardCharsets.UTF_8));
+                        }
+                    }
+*/
+                    /*
+                    // read complete content
+                    byte[] readLinearRecordsFile = desfire.readRecords((byte) (desFileNumberLinear & 0xff), 0, 0); // means from record 0 to 4, reading 1 record per read
+                    writeToUiAppend(readResult, printData("readLinearRecordsFile", readLinearRecordsFile));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readLinearRecordsFile, StandardCharsets.UTF_8));
+                    }
+
+                    // Cyclic Records file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "Cyclic Records file");
+
+                    byte[] payloadCyclicRecordsFile = pb.createCyclicRecordsFile(desFileNumberCyclic, PayloadBuilder.CommunicationSetting.Encrypted,
+                            0, 0, 0, 0, desFileCyclicSize, desFileCyclicRecords);
+                    writeToUiAppend(readResult, printData("payloadCyclicRecordsFile", payloadCyclicRecordsFile));
+                    boolean dfCreateCyclicRecordsFile = desfire.createCyclicRecordFile(payloadCyclicRecordsFile);
+                    writeToUiAppend(readResult, "dfCreateCyclicRecordsFile result: " + dfCreateCyclicRecordsFile);
+
+                    // auth for writing
+                    boolean dfAuthC1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
+                    writeToUiAppend(readResult, "dfAuthC1 result: " + dfAuthC1);
+
+                    String dataString = "EntryX from " + Utils.getTimestamp();
+                    byte[] payloadWriteCyclicData = pb.writeToCyclicRecordsFile(desFileNumberCyclic, dataString);
+                    writeToUiAppend(readResult, "dataString length: " + dataString.length() + " data: " + dataString);
+                    boolean dfWriteCyclic = desfire.writeRecord(payloadWriteCyclicData);
+                    writeToUiAppend(readResult, "dfWriteCyclic result: " + dfWriteCyclic);
+
+                    // don't forget to commit
+                    dfCommit = desfire.commitTransaction();
+                    writeToUiAppend(readResult, "dfCommit result: " + dfCommit);
+*/
+                    /*
+                    for (int i = 0; i < desFileCyclicRecords; i++) {
+                        writeToUiAppend(readResult, "cyclic records file record number: " + i);
+                        byte[] readCyclicRecordsFile = desfire.readRecords((byte) (desFileNumberCyclic & 0xff), i, 1); // means from record 0 to 4, reading 1 record per read
+                        writeToUiAppend(readResult, printData("readCyclicRecordsFile", readCyclicRecordsFile));
+                        if (readStandard != null) {
+                            writeToUiAppend(readResult, new String(readCyclicRecordsFile, StandardCharsets.UTF_8));
+                        }
+                    }
+                     */
+/*
+                    // read complete content
+                    byte[] readCyclicRecordsFile = desfire.readRecords((byte) (desFileNumberCyclic & 0xff), 0, 0); // means complete content
+                    writeToUiAppend(readResult, printData("readCyclicRecordsFile", readCyclicRecordsFile));
+                    if (readStandard != null) {
+                        writeToUiAppend(readResult, new String(readCyclicRecordsFile, StandardCharsets.UTF_8));
+                    }
+*/
+                } catch (Exception e) {
+                    writeToUiAppend(readResult, "Ex Error with DESFireEV1 + " + e.getMessage());
+                }
+
+
+
+
+
+
+
+            }
+        });
     }
 
 
@@ -4801,16 +5127,27 @@ Proximity Check using either the ACR122 or the Proxmark 3.
 
         // MIFARE DESFire CreateApplication using the default AID 000001h (see section 6.4.1 for the definition of the allowed AID values),
         // key settings equal to 0Fh, NumOfKeys equal to 01h, File-ID equal to 10E1h, DF-name equal to D2760000850101
-        //Command: 90 CA 00 00 0E 01 00 00 0F 21 10 E1 D2 76 00 00 85 01 01 00h
+        // Command: 90 CA 00 00 0E 01 00 00 0F 21 10 E1 D2 76 00 00 85 01 01 00h
 
+        // todo change this is rough code from MIFARE DESFire as Type 4 Tag AN11004.pdf
+        /*
+
+         */
+        byte[] commandSequence = Utils.hexStringToByteArray("90CA00000E0100000F2110E1D276000085010100");
+
+
+
+/*
         // create an application
         byte createApplicationCommand = (byte) 0xca;
         PayloadBuilder pb = new PayloadBuilder();
         byte[] createApplicationParameters = pb.createApplicationIso(applicationIdentifier, keySettings, numberOfKeys, applicationIdentifierFileId, applicationIdentifierDfName);
         writeToUiAppend(logTextView, printData("createApplicationIsoParameters", createApplicationParameters));
+        */
         byte[] createApplicationResponse = new byte[0];
         try {
-            createApplicationResponse = isoDep.transceive(wrapMessage(createApplicationCommand, createApplicationParameters));
+            createApplicationResponse = isoDep.transceive(commandSequence);
+            //createApplicationResponse = isoDep.transceive(wrapMessage(createApplicationCommand, createApplicationParameters));
             writeToUiAppend(logTextView, printData("createApplicationIsoResponse", createApplicationResponse));
             System.arraycopy(returnStatusBytes(createApplicationResponse), 0, response, 0, 2);
             //System.arraycopy(createApplicationResponse, 0, response, 0, createApplicationResponse.length);
@@ -5004,6 +5341,41 @@ Proximity Check using either the ACR122 or the Proxmark 3.
     /**
      * section for standard files
      */
+
+    private boolean createStandardFileIso(TextView logTextView, byte fileNumber, byte[] response) {
+
+        // this code is taken from MIFARE DESFire as Type 4 Tag AN11004.pdf
+        // this is raw code with fixed data, todo CHANGE
+        /*
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
+        ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh,
+        FileSize bigger equal to 00000Fh
+        Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
+         */
+        byte[] commandSequence = Utils.hexStringToByteArray("90CD0000090103E10000E00F000000");
+        byte[] createStandardFileResponse = new byte[0];
+        try {
+            createStandardFileResponse = isoDep.transceive(commandSequence);
+            //createStandardFileResponse = isoDep.transceive(wrapMessage(createStandardFileCommand, createStandardFileParameters));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(readResult, printData("createStandardFileResponse", createStandardFileResponse));
+        System.arraycopy(returnStatusBytes(createStandardFileResponse), 0, response, 0, 2);
+        writeToUiAppend(logTextView, printData("createStandardFileResponse", createStandardFileResponse));
+        if (checkDuplicateError(createStandardFileResponse)) {
+            writeToUiAppend(logTextView, "the file was not created as it already exists, proceed");
+            return true;
+        }
+        if (checkResponse(createStandardFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
 
     private boolean createStandardFile(TextView logTextView, byte fileNumber, byte[] response) {
         // we create a standard file within the selected application

@@ -452,7 +452,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="8dp"
                 android:layout_weight="1"
-                android:text="xxx" />
+                android:text="Format to NDEF" />
         </LinearLayout>
 
         <com.google.android.material.textfield.TextInputLayout
