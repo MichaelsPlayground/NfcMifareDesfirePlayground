@@ -176,7 +176,6 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                 // first we setup a des-key secured application
                 byte[] responseData = new byte[2];
 
-                PayloadBuilder pb = new PayloadBuilder();
                 try {
                     byte DES_MASTER_KEY_NUMBER = (byte) 0x00;
                     byte[] DES_MASTER_KEY = new byte[8]; // for the master application
@@ -185,11 +184,14 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     writeToUiAppend(readResult, "Format the tag as Tag 4 type (NDEF)");
 
                     // select the master file application
-
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "1. MIFARE DESFire SelectApplication with AID equal to 000000h (PICC level)");
                     boolean selectMasterApplicationSuccess = selectApplicationDes(readResult, AID_Master, responseData);
                     writeToUiAppend(readResult, "selectMasterApplication result: " + selectMasterApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
-
+/*
                     // authenticate
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "");
                     responseData = new byte[2];
                     // we set the rw + car rights to key 0 so we need to authenticate with key 0 first to proceed
                     boolean authenticateMasterSuccess = authenticateApplicationDes(readResult, DES_MASTER_KEY_NUMBER, DES_MASTER_KEY, false, responseData);
@@ -198,20 +200,27 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                         writeToUiAppend(readResult, "the authenticationMaster was not successful, aborted");
                         return;
                     }
-
+*/
                     // at this point the PICC needs these environments:
-                    // create an application with this AII: 0xEEEE10
-                    byte[] AID_NDEF = Utils.hexStringToByteArray("EEEE10");
+
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "");
+                    byte[] AID_NDEF = Utils.hexStringToByteArray("010000");
                     byte APPLICATION_KEY_SETTINGS = (byte) 0x0F;
-                    byte FILE_ID = (byte) 0x01;
-                    byte[] ISO_FILE_ID = Utils.hexStringToByteArray("E110");
+                    byte numberOfKeys = (byte) 0x21; // number of key: 1, TDES keys
+                    //byte COMMUNICATION_SETTINGS = (byte) 0x0f;
+                    byte FILE_ID_01 = (byte) 0x01;
+                    byte[] ISO_FILE_ID_01 = Utils.hexStringToByteArray("10E1");
+                    byte FILE_ID_02 = (byte) 0x02;
                     byte[] ISO_DF = Utils.hexStringToByteArray("D2760000850101"); // this is the AID for NDEF
                     writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "Create application");
 
                     // create the application
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "2. MIFARE DESFire CreateApplication using the default AID 000001h");
                     responseData = new byte[2];
-                    boolean createApplicationSuccess = createApplicationIsoDes(readResult, AID_NDEF, APPLICATION_KEY_SETTINGS, (byte) 0x01, ISO_FILE_ID, ISO_DF,  responseData);
+                    boolean createApplicationSuccess = createApplicationIsoDes(readResult, AID_NDEF, APPLICATION_KEY_SETTINGS, numberOfKeys, ISO_FILE_ID_01, ISO_DF,  responseData);
                     writeToUiAppend(readResult, "createApplicationIso result: " + createApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!createApplicationSuccess) {
                         writeToUiAppend(readResult, "the createApplicationIso was not successful, aborted");
@@ -219,6 +228,8 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     }
 
                     // select the application
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "3. MIFARE DESFire SelectApplication (Select previously created application)");
                     responseData = new byte[2];
                     byte[] AID_NDEF2 = Utils.hexStringToByteArray("000001");
                     //boolean selectApplicationSuccess = selectApplicationDes(readResult, AID_NDEF2, responseData);
@@ -230,8 +241,11 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     }
 
                     // step 04 create a standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "4. MIFARE DESFire CreateStdDataFile with FileNo equal to 01h");
                     responseData = new byte[2];
-                    boolean createStandardFileIsoSuccess = createStandardFileIso(readResult, FILE_ID, responseData);
+                    boolean createStandardFileIsoSuccess = createStandardFileIso(readResult, FILE_ID_01, ISO_FILE_ID_01, PayloadBuilder.CommunicationSetting.Plain,
+                            14, 14, 14, 14, 14, responseData);
                     writeToUiAppend(readResult, "createStandardFileIso result: " + createStandardFileIsoSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!createStandardFileIsoSuccess) {
                         writeToUiAppend(readResult, "the createStandardFileIso was not successful, aborted");
@@ -239,9 +253,11 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     }
 
                     // step 05 write to standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "5. MIFARE DESFire WriteData to write the content of the CC File with CCLEN equal to 000Fh");
                     responseData = new byte[2];
                     byte[] dataToWriteByte = "hello".getBytes(StandardCharsets.UTF_8);
-                    boolean writeToStandardFileNdefSuccess = writeToStandardFileNdef(readResult, FILE_ID, dataToWriteByte, responseData);
+                    boolean writeToStandardFileNdefSuccess = writeToStandardFileNdef(readResult, FILE_ID_01, dataToWriteByte, responseData);
                     writeToUiAppend(readResult, "writeToStandardFileNdef result: " + writeToStandardFileNdefSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!writeToStandardFileNdefSuccess) {
                         writeToUiAppend(readResult, "the writeToStandardFileNdef was not successful, aborted");
@@ -249,8 +265,10 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     }
 
                     // step 06 create a standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "6. MIFARE DESFire CreateStdDataFile with FileNo equal to 02h");
                     responseData = new byte[2];
-                    boolean createStandardFileIsoStep06Success = createStandardFileIsoStep6(readResult, FILE_ID, responseData);
+                    boolean createStandardFileIsoStep06Success = createStandardFileIsoStep6(readResult, FILE_ID_02, responseData);
                     writeToUiAppend(readResult, "createStandardFileIsoStep06 result: " + createStandardFileIsoSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!createStandardFileIsoStep06Success) {
                         writeToUiAppend(readResult, "the createStandardFileIsoStep06 was not successful, aborted");
@@ -258,9 +276,11 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     }
 
                     // step 07 write to standard file
+                    writeToUiAppend(readResult, "");
+                    writeToUiAppend(readResult, "MIFARE DESFire WriteData to write the content of the NDEF File with NLEN equal to 0000h");
                     responseData = new byte[2];
                     byte[] dataToWriteByte2 = "hello".getBytes(StandardCharsets.UTF_8);
-                    boolean writeToStandardFileNdefStep07Success = writeToStandardFileNdefStep07(readResult, FILE_ID, dataToWriteByte2, responseData);
+                    boolean writeToStandardFileNdefStep07Success = writeToStandardFileNdefStep07(readResult, FILE_ID_02, dataToWriteByte2, responseData);
                     writeToUiAppend(readResult, "writeToStandardFileNdefStep07 result: " + writeToStandardFileNdefStep07Success + " with response: " + Utils.bytesToHex(responseData));
                     if (!writeToStandardFileNdefStep07Success) {
                         writeToUiAppend(readResult, "the writeToStandardFileNdefStep07 was not successful, aborted");
@@ -292,6 +312,7 @@ Expected Response: 91 00h
 4. MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
 ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh, FileSize bigger equal to 00000Fh
 Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
+NOTE: There is an error in the command, the Access Rights do have a wrong value ("00 E0" instead of "EE EE"
 Expected Response: 91 00h
 
 5. MIFARE DESFire WriteData to write the content of the CC File with CCLEN equal
@@ -372,6 +393,257 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
     /**
      * start section for ready to use commands
      */
+
+    private boolean createApplicationIsoDes(TextView logTextView, byte[] applicationIdentifier, byte keySettings, byte numberOfKeys, byte[] applicationIdentifierFileId, byte[] applicationIdentifierDfName, byte[] response) {
+        if (logTextView == null) return false;
+        if (applicationIdentifier == null) return false;
+        if (applicationIdentifier.length != 3) return false;
+
+        // MIFARE DESFire CreateApplication using the default AID 000001h (see section 6.4.1 for the definition of the allowed AID values),
+        // key settings equal to 0Fh, NumOfKeys equal to 01h, File-ID equal to 10E1h, DF-name equal to D2760000850101
+        // Command: 90 CA 00 00 0E 01 00 00 0F 21 10 E1 D2 76 00 00 85 01 01 00h
+
+        // todo change this is rough code from MIFARE DESFire as Type 4 Tag AN11004.pdf
+        /*
+
+         */
+        byte[] commandSequence = Utils.hexStringToByteArray("90CA00000E0100000F2110E1D276000085010100"); // this is the command for 0e0e
+        // byte[] commandSequence = Utils.hexStringToByteArray("90CA00000E0100000F2110E1D276000085010100"); this is the command in the pdf
+
+        byte createApplicationCommand = (byte) 0xCA;
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] commandParameters = pb.createApplicationIso(applicationIdentifier, keySettings, numberOfKeys, applicationIdentifierFileId, applicationIdentifierDfName);
+        byte[] wrappedCommand = new byte[0];
+        try {
+            wrappedCommand = wrapMessage(createApplicationCommand, commandParameters);
+        } catch (Exception e) {
+            writeToUiAppend(logTextView, "error on running the createApplicationIsoDes command " + e.getMessage());
+        }
+        writeToUiAppend(logTextView, printData("commandSequence", commandSequence));
+        writeToUiAppend(logTextView, printData("command Builder", wrappedCommand));
+
+/*
+        // create an application
+        byte createApplicationCommand = (byte) 0xca;
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] createApplicationParameters = pb.createApplicationIso(applicationIdentifier, keySettings, numberOfKeys, applicationIdentifierFileId, applicationIdentifierDfName);
+        writeToUiAppend(logTextView, printData("createApplicationIsoParameters", createApplicationParameters));
+        */
+        byte[] createApplicationResponse = new byte[0];
+        try {
+            //createApplicationResponse = isoDep.transceive(commandSequence);
+            createApplicationResponse = isoDep.transceive(wrappedCommand);
+            //createApplicationResponse = isoDep.transceive(wrapMessage(createApplicationCommand, createApplicationParameters));
+            //writeToUiAppend(logTextView, printData("createApplicationIsoResponse", createApplicationResponse));
+            System.arraycopy(returnStatusBytes(createApplicationResponse), 0, response, 0, 2);
+            //System.arraycopy(createApplicationResponse, 0, response, 0, createApplicationResponse.length);
+            if (checkResponse(createApplicationResponse)) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "createApplicationIso transceive failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean selectApplicationIso(TextView logTextView, byte[] applicationIdentifier, byte[] response) {
+
+        // todo change this is rough programming
+        byte[] commandSequence = Utils.hexStringToByteArray("905A00000301000000");
+
+
+        // select application
+        byte selectApplicationCommand = (byte) 0x5a;
+        byte[] selectApplicationResponse = new byte[0];
+        try {
+            selectApplicationResponse = isoDep.transceive(commandSequence);
+            //selectApplicationResponse = isoDep.transceive(wrapMessage(selectApplicationCommand, applicationIdentifier));
+            writeToUiAppend(logTextView, printData("selectApplicationResponse", selectApplicationResponse));
+            System.arraycopy(returnStatusBytes(selectApplicationResponse), 0, response, 0, 2);
+            //System.arraycopy(selectApplicationResponse, 0, response, 0, selectApplicationResponse.length);
+            if (checkResponse(selectApplicationResponse)) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "selectApplicationDes transceive failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean createStandardFileIso(TextView logTextView, int fileNumber, byte[] isoFileId, PayloadBuilder.CommunicationSetting communicationSetting,
+                                          int keyRW, int keyCar, int keyR, int keyW, int fileSize, byte[] response) {
+
+        // this code is taken from MIFARE DESFire as Type 4 Tag AN11004.pdf
+        // this is raw code with fixed data, todo CHANGE
+        /*
+        step 4
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
+        ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh,
+        FileSize bigger equal to 00000Fh
+        Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
+        NOTE: There is an error in the command, the Access Rights do have a wrong value
+
+        step 6
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 02h (NDEF File DESFire FID),
+        ISO FileID equal to E104h, ComSet equal to 00h, AccessRights equal to EEE0h,
+        FileSize equal to 000800h (2048 Bytes)
+        Command: 90 CD 00 00 09 02 04 E1 00 E0 EE 00 08 00 00h
+         */
+        byte[] commandSequence = Utils.hexStringToByteArray("90CD0000090103E100EEEE0F000000");
+
+        byte createApplicationCommand = (byte) 0xCD;
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] commandParameters = pb.createStandardFileIso(fileNumber, isoFileId, communicationSetting, keyRW, keyCar, keyR, keyW, fileSize);
+        byte[] wrappedCommand = new byte[0];
+        try {
+            wrappedCommand = wrapMessage(createApplicationCommand, commandParameters);
+        } catch (Exception e) {
+            writeToUiAppend(logTextView, "error on running the createApplicationIsoDes command " + e.getMessage());
+        }
+        writeToUiAppend(logTextView, printData("commandSequence", commandSequence));
+        writeToUiAppend(logTextView, printData("command Builder", wrappedCommand));
+
+
+
+        byte[] createStandardFileResponse = new byte[0];
+        try {
+            createStandardFileResponse = isoDep.transceive(wrappedCommand);
+            //createStandardFileResponse = isoDep.transceive(wrapMessage(createStandardFileCommand, createStandardFileParameters));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(readResult, printData("createStandardFileResponse", createStandardFileResponse));
+        System.arraycopy(returnStatusBytes(createStandardFileResponse), 0, response, 0, 2);
+        writeToUiAppend(logTextView, printData("createStandardFileResponse", createStandardFileResponse));
+        if (checkDuplicateError(createStandardFileResponse)) {
+            writeToUiAppend(logTextView, "the file was not created as it already exists, proceed");
+            return true;
+        }
+        if (checkResponse(createStandardFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean createStandardFileIsoStep6(TextView logTextView, byte fileNumber, byte[] response) {
+
+        // this code is taken from MIFARE DESFire as Type 4 Tag AN11004.pdf
+        // this is raw code with fixed data, todo CHANGE
+        /*
+        step 4
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
+        ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh,
+        FileSize bigger equal to 00000Fh
+        Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
+
+        step 6
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 02h (NDEF File DESFire FID),
+        ISO FileID equal to E104h, ComSet equal to 00h, AccessRights equal to EEE0h,
+        FileSize equal to 000800h (2048 Bytes)
+        Command: 90 CD 00 00 09 02 04 E1 00 E0 EE 00 08 00 00h
+         */
+        //byte[] commandSequence =  Utils.hexStringToByteArray("90CD0000090103E10000E00F000000");
+        byte[] commandSequence = Utils.hexStringToByteArray("90CD0000090204E100E0EE00080000");
+        byte[] createStandardFileResponse = new byte[0];
+        try {
+            createStandardFileResponse = isoDep.transceive(commandSequence);
+            //createStandardFileResponse = isoDep.transceive(wrapMessage(createStandardFileCommand, createStandardFileParameters));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(readResult, printData("createStandardFileResponse", createStandardFileResponse));
+        System.arraycopy(returnStatusBytes(createStandardFileResponse), 0, response, 0, 2);
+        writeToUiAppend(logTextView, printData("createStandardFileResponse", createStandardFileResponse));
+        if (checkDuplicateError(createStandardFileResponse)) {
+            writeToUiAppend(logTextView, "the file was not created as it already exists, proceed");
+            return true;
+        }
+        if (checkResponse(createStandardFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean writeToStandardFileNdef(TextView logTextView, byte fileNumber, byte[] data, byte[] response) {
+
+        /*
+        MIFARE DESFire WriteData to write the content of the CC File with CCLEN equal to 000Fh,
+        Mapping Version equal to 20h, MLe equal to 003Ah, MLc equal to 0034h,
+        and NDEF File Control TLV equal to: T=04h, L=06h, V=E1 04 (NDEF ISO FID = E104h)
+        08 00 (NDEF File size = 2048 Bytes) 00 (free read access) 00 (free write access)
+        Command: 90 3D 00 00 16 01 00 00 00 0F 00 00 00 0F 20 00 3A 00 34 04 06 E1 04 08 00 00 00 00h
+         */
+        byte[] commandSequence = Utils.hexStringToByteArray("903D000016010000000F0000000F20003A00340406E1040800000000");
+        byte[] writeStandardFileResponse = new byte[0];
+        try {
+            writeStandardFileResponse = isoDep.transceive(commandSequence);
+            //writeStandardFileResponse = isoDep.transceive(wrapMessage(writeStandardFileCommand, writeStandardFileParameters));
+            //writeToUiAppend(logTextView, printData("send APDU", wrapMessage(writeStandardFileCommand, writeStandardFileParameters)));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(logTextView, printData("writeStandardFileResponse", writeStandardFileResponse));
+        System.arraycopy(returnStatusBytes(writeStandardFileResponse), 0, response, 0, 2);
+        if (checkResponse(writeStandardFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean writeToStandardFileNdefStep07(TextView logTextView, byte fileNumber, byte[] data, byte[] response) {
+
+        /*
+        step 05
+        MIFARE DESFire WriteData to write the content of the CC File with CCLEN equal to 000Fh,
+        Mapping Version equal to 20h, MLe equal to 003Ah, MLc equal to 0034h,
+        and NDEF File Control TLV equal to: T=04h, L=06h, V=E1 04 (NDEF ISO FID = E104h)
+        08 00 (NDEF File size = 2048 Bytes) 00 (free read access) 00 (free write access)
+        Command: 90 3D 00 00 16 01 00 00 00 0F 00 00 00 0F 20 00 3A 00 34 04 06 E1 04 08 00 00 00 00h
+
+        step 07
+        MIFARE DESFire WriteData to write the content of the NDEF File with NLEN equal to 0000h,
+        and no NDEF Message
+        Command: 90 3D 00 00 09 02 00 00 00 02 00 00 00 00 00h
+         */
+        //byte[] commandSequence = Utils.hexStringToByteArray("903D000016010000000F0000000F20003A00340406E1040800000000");
+        byte[] commandSequence = Utils.hexStringToByteArray("903D00000902000000020000000000");
+        byte[] writeStandardFileResponse = new byte[0];
+        try {
+            writeStandardFileResponse = isoDep.transceive(commandSequence);
+            //writeStandardFileResponse = isoDep.transceive(wrapMessage(writeStandardFileCommand, writeStandardFileParameters));
+            //writeToUiAppend(logTextView, printData("send APDU", wrapMessage(writeStandardFileCommand, writeStandardFileParameters)));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(logTextView, printData("writeStandardFileResponse", writeStandardFileResponse));
+        System.arraycopy(returnStatusBytes(writeStandardFileResponse), 0, response, 0, 2);
+        if (checkResponse(writeStandardFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+
+    }
+
+
+
 
     /**
      * section for authentication with aes keys, copied from DESFireEV1.java
@@ -891,48 +1163,7 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
         }
     }
 
-    private boolean createApplicationIsoDes(TextView logTextView, byte[] applicationIdentifier, byte keySettings, byte numberOfKeys, byte[] applicationIdentifierFileId, byte[] applicationIdentifierDfName, byte[] response) {
-        if (logTextView == null) return false;
-        if (applicationIdentifier == null) return false;
-        if (applicationIdentifier.length != 3) return false;
 
-        // MIFARE DESFire CreateApplication using the default AID 000001h (see section 6.4.1 for the definition of the allowed AID values),
-        // key settings equal to 0Fh, NumOfKeys equal to 01h, File-ID equal to 10E1h, DF-name equal to D2760000850101
-        // Command: 90 CA 00 00 0E 01 00 00 0F 21 10 E1 D2 76 00 00 85 01 01 00h
-
-        // todo change this is rough code from MIFARE DESFire as Type 4 Tag AN11004.pdf
-        /*
-
-         */
-        byte[] commandSequence = Utils.hexStringToByteArray("90CA00000E0100000F2110E1D276000085010100");
-
-
-
-/*
-        // create an application
-        byte createApplicationCommand = (byte) 0xca;
-        PayloadBuilder pb = new PayloadBuilder();
-        byte[] createApplicationParameters = pb.createApplicationIso(applicationIdentifier, keySettings, numberOfKeys, applicationIdentifierFileId, applicationIdentifierDfName);
-        writeToUiAppend(logTextView, printData("createApplicationIsoParameters", createApplicationParameters));
-        */
-        byte[] createApplicationResponse = new byte[0];
-        try {
-            createApplicationResponse = isoDep.transceive(commandSequence);
-            //createApplicationResponse = isoDep.transceive(wrapMessage(createApplicationCommand, createApplicationParameters));
-            writeToUiAppend(logTextView, printData("createApplicationIsoResponse", createApplicationResponse));
-            System.arraycopy(returnStatusBytes(createApplicationResponse), 0, response, 0, 2);
-            //System.arraycopy(createApplicationResponse, 0, response, 0, createApplicationResponse.length);
-            if (checkResponse(createApplicationResponse)) {
-                return true;
-            } else {
-                return false;
-            }
-        } catch (Exception e) {
-            //throw new RuntimeException(e);
-            writeToUiAppend(logTextView, "createApplicationIso transceive failed: " + e.getMessage());
-            return false;
-        }
-    }
 
     private boolean createApplicationAes(TextView logTextView, byte[] applicationIdentifier, byte numberOfKeys, byte[] response) {
         if (logTextView == null) return false;
@@ -988,32 +1219,7 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
         }
     }
 
-    private boolean selectApplicationIso(TextView logTextView, byte[] applicationIdentifier, byte[] response) {
 
-        // todo change this is rough programming
-        byte[] commandSequence = Utils.hexStringToByteArray("905A00000301000000");
-
-
-        // select application
-        byte selectApplicationCommand = (byte) 0x5a;
-        byte[] selectApplicationResponse = new byte[0];
-        try {
-            selectApplicationResponse = isoDep.transceive(commandSequence);
-            //selectApplicationResponse = isoDep.transceive(wrapMessage(selectApplicationCommand, applicationIdentifier));
-            writeToUiAppend(logTextView, printData("selectApplicationResponse", selectApplicationResponse));
-            System.arraycopy(returnStatusBytes(selectApplicationResponse), 0, response, 0, 2);
-            //System.arraycopy(selectApplicationResponse, 0, response, 0, selectApplicationResponse.length);
-            if (checkResponse(selectApplicationResponse)) {
-                return true;
-            } else {
-                return false;
-            }
-        } catch (Exception e) {
-            //throw new RuntimeException(e);
-            writeToUiAppend(logTextView, "selectApplicationDes transceive failed: " + e.getMessage());
-            return false;
-        }
-    }
 
     private byte[] getKeySettings(TextView logTextView, byte[] response) {
         // getKeySettingsResponse length: 4 data: 0f 01 9100
@@ -1038,88 +1244,7 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
      * section for standard files
      */
 
-    private boolean createStandardFileIso(TextView logTextView, byte fileNumber, byte[] response) {
 
-        // this code is taken from MIFARE DESFire as Type 4 Tag AN11004.pdf
-        // this is raw code with fixed data, todo CHANGE
-        /*
-        step 4
-        MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
-        ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh,
-        FileSize bigger equal to 00000Fh
-        Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
-
-        step 6
-        MIFARE DESFire CreateStdDataFile with FileNo equal to 02h (NDEF File DESFire FID),
-        ISO FileID equal to E104h, ComSet equal to 00h, AccessRights equal to EEE0h,
-        FileSize equal to 000800h (2048 Bytes)
-        Command: 90 CD 00 00 09 02 04 E1 00 E0 EE 00 08 00 00h
-         */
-        byte[] commandSequence = Utils.hexStringToByteArray("90CD0000090103E10000E00F000000");
-        byte[] createStandardFileResponse = new byte[0];
-        try {
-            createStandardFileResponse = isoDep.transceive(commandSequence);
-            //createStandardFileResponse = isoDep.transceive(wrapMessage(createStandardFileCommand, createStandardFileParameters));
-        } catch (Exception e) {
-            //throw new RuntimeException(e);
-            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
-            return false;
-        }
-        writeToUiAppend(readResult, printData("createStandardFileResponse", createStandardFileResponse));
-        System.arraycopy(returnStatusBytes(createStandardFileResponse), 0, response, 0, 2);
-        writeToUiAppend(logTextView, printData("createStandardFileResponse", createStandardFileResponse));
-        if (checkDuplicateError(createStandardFileResponse)) {
-            writeToUiAppend(logTextView, "the file was not created as it already exists, proceed");
-            return true;
-        }
-        if (checkResponse(createStandardFileResponse)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private boolean createStandardFileIsoStep6(TextView logTextView, byte fileNumber, byte[] response) {
-
-        // this code is taken from MIFARE DESFire as Type 4 Tag AN11004.pdf
-        // this is raw code with fixed data, todo CHANGE
-        /*
-        step 4
-        MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
-        ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh,
-        FileSize bigger equal to 00000Fh
-        Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
-
-        step 6
-        MIFARE DESFire CreateStdDataFile with FileNo equal to 02h (NDEF File DESFire FID),
-        ISO FileID equal to E104h, ComSet equal to 00h, AccessRights equal to EEE0h,
-        FileSize equal to 000800h (2048 Bytes)
-        Command: 90 CD 00 00 09 02 04 E1 00 E0 EE 00 08 00 00h
-         */
-        //byte[] commandSequence =  Utils.hexStringToByteArray("90CD0000090103E10000E00F000000");
-        byte[] commandSequence = Utils.hexStringToByteArray("90CD0000090204E100E0EE00080000");
-        byte[] createStandardFileResponse = new byte[0];
-        try {
-            createStandardFileResponse = isoDep.transceive(commandSequence);
-            //createStandardFileResponse = isoDep.transceive(wrapMessage(createStandardFileCommand, createStandardFileParameters));
-        } catch (Exception e) {
-            //throw new RuntimeException(e);
-            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
-            return false;
-        }
-        writeToUiAppend(readResult, printData("createStandardFileResponse", createStandardFileResponse));
-        System.arraycopy(returnStatusBytes(createStandardFileResponse), 0, response, 0, 2);
-        writeToUiAppend(logTextView, printData("createStandardFileResponse", createStandardFileResponse));
-        if (checkDuplicateError(createStandardFileResponse)) {
-            writeToUiAppend(logTextView, "the file was not created as it already exists, proceed");
-            return true;
-        }
-        if (checkResponse(createStandardFileResponse)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
 
 
     private boolean createStandardFile(TextView logTextView, byte fileNumber, byte[] response) {
@@ -1388,71 +1513,6 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
         return decryptedResponse;
     }
 
-    private boolean writeToStandardFileNdef(TextView logTextView, byte fileNumber, byte[] data, byte[] response) {
-
-        /*
-        MIFARE DESFire WriteData to write the content of the CC File with CCLEN equal to 000Fh,
-        Mapping Version equal to 20h, MLe equal to 003Ah, MLc equal to 0034h,
-        and NDEF File Control TLV equal to: T=04h, L=06h, V=E1 04 (NDEF ISO FID = E104h)
-        08 00 (NDEF File size = 2048 Bytes) 00 (free read access) 00 (free write access)
-        Command: 90 3D 00 00 16 01 00 00 00 0F 00 00 00 0F 20 00 3A 00 34 04 06 E1 04 08 00 00 00 00h
-         */
-        byte[] commandSequence = Utils.hexStringToByteArray("903D000016010000000F0000000F20003A00340406E1040800000000");
-        byte[] writeStandardFileResponse = new byte[0];
-        try {
-            writeStandardFileResponse = isoDep.transceive(commandSequence);
-            //writeStandardFileResponse = isoDep.transceive(wrapMessage(writeStandardFileCommand, writeStandardFileParameters));
-            //writeToUiAppend(logTextView, printData("send APDU", wrapMessage(writeStandardFileCommand, writeStandardFileParameters)));
-        } catch (Exception e) {
-            //throw new RuntimeException(e);
-            writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
-            return false;
-        }
-        writeToUiAppend(logTextView, printData("writeStandardFileResponse", writeStandardFileResponse));
-        System.arraycopy(returnStatusBytes(writeStandardFileResponse), 0, response, 0, 2);
-        if (checkResponse(writeStandardFileResponse)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private boolean writeToStandardFileNdefStep07(TextView logTextView, byte fileNumber, byte[] data, byte[] response) {
-
-        /*
-        step 05
-        MIFARE DESFire WriteData to write the content of the CC File with CCLEN equal to 000Fh,
-        Mapping Version equal to 20h, MLe equal to 003Ah, MLc equal to 0034h,
-        and NDEF File Control TLV equal to: T=04h, L=06h, V=E1 04 (NDEF ISO FID = E104h)
-        08 00 (NDEF File size = 2048 Bytes) 00 (free read access) 00 (free write access)
-        Command: 90 3D 00 00 16 01 00 00 00 0F 00 00 00 0F 20 00 3A 00 34 04 06 E1 04 08 00 00 00 00h
-
-        step 07
-        MIFARE DESFire WriteData to write the content of the NDEF File with NLEN equal to 0000h,
-        and no NDEF Message
-        Command: 90 3D 00 00 09 02 00 00 00 02 00 00 00 00 00h
-         */
-        //byte[] commandSequence = Utils.hexStringToByteArray("903D000016010000000F0000000F20003A00340406E1040800000000");
-        byte[] commandSequence = Utils.hexStringToByteArray("903D00000902000000020000000000");
-        byte[] writeStandardFileResponse = new byte[0];
-        try {
-            writeStandardFileResponse = isoDep.transceive(commandSequence);
-            //writeStandardFileResponse = isoDep.transceive(wrapMessage(writeStandardFileCommand, writeStandardFileParameters));
-            //writeToUiAppend(logTextView, printData("send APDU", wrapMessage(writeStandardFileCommand, writeStandardFileParameters)));
-        } catch (Exception e) {
-            //throw new RuntimeException(e);
-            writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
-            return false;
-        }
-        writeToUiAppend(logTextView, printData("writeStandardFileResponse", writeStandardFileResponse));
-        System.arraycopy(returnStatusBytes(writeStandardFileResponse), 0, response, 0, 2);
-        if (checkResponse(writeStandardFileResponse)) {
-            return true;
-        } else {
-            return false;
-        }
-
-    }
 
 
     // note: we don't need to commit any write on Standard Files
