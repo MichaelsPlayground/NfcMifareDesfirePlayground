@@ -91,52 +91,6 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
      * constants for application "DesStandard", 3 DES keys, 2 files with each 32 bytes
      */
 
-    private final byte[] AID_DesStandard = new byte[]{(byte) 0xa9, (byte) 0xa8, (byte) 0xa1};
-    private final byte AID_DesStandard_number_of_keys = (byte) 0x03; // key0 general, key1 read, key2 write access
-    private final byte[] AID_DesStandard_Key0 = Utils.hexStringToByteArray("0000000000000000"); // default key, lets work on this
-    private final byte AID_DesStandard_Key0_Number = (byte) 0x00;
-    private final byte[] AID_DesStandard_Key1 = Utils.hexStringToByteArray("0000000000000000");
-    private final byte[] AID_DesStandard_Key1_New = Utils.hexStringToByteArray("1122119988776601");
-    private final byte AID_DesStandard_Key1_Number = (byte) 0x01;
-    private final byte[] AID_DesStandard_Key2 = Utils.hexStringToByteArray("0000000000000000");
-    private final byte[] AID_DesStandard_Key2_new = Utils.hexStringToByteArray("1122119988776602");
-    private final byte AID_DesStandard_Key2_Number = (byte) 0x02;
-    private final byte DesStandardFileFileNumber1 = (byte) 0x01;
-    private final byte DesStandardFileFileNumber2 = (byte) 0x02;
-
-    /**
-     * constants for application "DesValue", 3 DES keys, 1 ValueFile with increment and decrement
-     */
-
-    private final byte[] AID_DesValue = new byte[]{(byte) 0xa9, (byte) 0xa8, (byte) 0xa2};
-    private final byte AID_DesValue_number_of_keys = (byte) 0x03; // key0 general, key1 read, key2 write access
-    private final byte[] AID_DesValue_Key0 = Utils.hexStringToByteArray("0000000000000000"); // default key, lets work on this
-    private final byte AID_DesValue_Key0_Number = (byte) 0x00;
-    private final byte[] AID_DesValue_Key1 = Utils.hexStringToByteArray("0000000000000000");
-    private final byte[] AID_DesValue_Key1_New = Utils.hexStringToByteArray("2222119988776601");
-    private final byte AID_DesValue_Key1_Number = (byte) 0x01;
-    private final byte[] AID_DesValue_Key2 = Utils.hexStringToByteArray("0000000000000000");
-    private final byte[] AID_DesValue_Key2_new = Utils.hexStringToByteArray("2222119988776602");
-    private final byte AID_DesValue_Key2_Number = (byte) 0x02;
-    private final byte DesValueFileFileNumber1 = (byte) 0x02;
-    private final byte DesValueFileFileNumber2 = (byte) 0x03;
-
-    /**
-     * constants for application "DesLog", 3 DES keys, 1 Cycle File with 5 (+1 spare) records with each 32 bytes
-     */
-    private final byte[] AID_DesLog = new byte[]{(byte) 0xa9, (byte) 0xa8, (byte) 0xa3}; // A3 A8 A9
-    private final byte AID_DesLog_number_of_keys = (byte) 0x03; // key0 general, key1 read, key2 write access
-    private final byte[] AID_DesLog_Key0 = Utils.hexStringToByteArray("0000000000000000"); // default key, lets work on this
-    private final byte AID_DesLog_Key0_Number = (byte) 0x00;
-    private final byte[] AID_DesLog_Key1 = Utils.hexStringToByteArray("0000000000000000"); // default key, lets work on this
-    private final byte[] AID_DesLog_Key1_New = Utils.hexStringToByteArray("3322119988776601"); // new key, lets work on this
-    private final byte AID_DesLog_Key1_Number = (byte) 0x01;
-    private final byte[] AID_DesLog_Key2 = Utils.hexStringToByteArray("0000000000000000"); // default key, lets work on this
-    private final byte[] AID_DesLog_Key2_New = Utils.hexStringToByteArray("3322119988776602"); // new key, lets work on this
-    //private final byte[] AID_DesLog_Key2_New2 = Utils.hexStringToByteArray("3322119988776612"); // new key, lets work on this
-    private final byte AID_DesLog_Key2_Number = (byte) 0x02;
-    private final byte DesLogCyclicFileFileNumber = (byte) 0x04;
-    private final byte DesLogCyclicFileNumberOfRecords = (byte) 0x06; // 5 records (+1 record as spare record for writing data before committing), fixed for this method
 
     /**
      * The following constants are global defined and got updated through several steps on ENCRYPTION and DECRYPTION
@@ -205,15 +159,25 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
 
                     writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "");
-                    byte[] AID_NDEF = Utils.hexStringToByteArray("010000");
+                    byte[] AID_NDEF = Utils.hexStringToByteArray("010000"); // the AID is 00 00 01 but data is in low endian
+                    byte[] ISO_APPLICATION_ID = Utils.hexStringToByteArray("10E1"); // the AID is E110 but written in low endian
                     byte APPLICATION_KEY_SETTINGS = (byte) 0x0F;
-                    byte numberOfKeys = (byte) 0x21; // number of key: 1, TDES keys
+                    byte numberOfKeys = (byte) 0x21; // number of keys: 1, TDES keys
                     //byte COMMUNICATION_SETTINGS = (byte) 0x0f;
                     byte FILE_ID_01 = (byte) 0x01;
-                    byte[] ISO_FILE_ID_01 = Utils.hexStringToByteArray("03E1");
+                    byte[] ISO_FILE_ID_01 = Utils.hexStringToByteArray("03E1"); // the file ID is E103 but written as low endian
                     int FILE_01_SIZE = 15;
                     byte FILE_ID_02 = (byte) 0x02;
+                    byte[] ISO_FILE_ID_02 = Utils.hexStringToByteArray("04E1");// the file ID is E104 but written as low endian
+                    int FILE_02_SIZE = 2048; // FileSize equal to 000800h (2048 Bytes)
                     byte[] ISO_DF = Utils.hexStringToByteArray("D2760000850101"); // this is the AID for NDEF
+
+                    // ndefMessage which is a URI record with the URL "http://www.example.com/"
+                    byte[] ndefMessage = new byte[] {
+                            (byte)0xD1, (byte)0x01, (byte)0x0D, (byte)0x55, (byte)0x01, (byte)0x65, (byte)0x78, (byte)0x61, (byte)0x6D, (byte)0x70, (byte)0x6C, (byte)0x65, (byte)0x2E, (byte)0x63, (byte)0x6F, (byte)0x6D, (byte)0x2F
+                    };
+
+
                     writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "Create application");
 
@@ -221,7 +185,7 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "2. MIFARE DESFire CreateApplication using the default AID 000001h");
                     responseData = new byte[2];
-                    boolean createApplicationSuccess = createApplicationIsoDes(readResult, AID_NDEF, APPLICATION_KEY_SETTINGS, numberOfKeys, ISO_FILE_ID_01, ISO_DF,  responseData);
+                    boolean createApplicationSuccess = createApplicationIsoDes(readResult, AID_NDEF, APPLICATION_KEY_SETTINGS, numberOfKeys, ISO_APPLICATION_ID, ISO_DF,  responseData);
                     writeToUiAppend(readResult, "createApplicationIso result: " + createApplicationSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!createApplicationSuccess) {
                         writeToUiAppend(readResult, "the createApplicationIso was not successful, aborted");
@@ -232,9 +196,7 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "3. MIFARE DESFire SelectApplication (Select previously created application)");
                     responseData = new byte[2];
-                    byte[] AID_NDEF2 = Utils.hexStringToByteArray("000001");
-                    //boolean selectApplicationSuccess = selectApplicationDes(readResult, AID_NDEF2, responseData);
-                    boolean selectApplicationIsoSuccess = selectApplicationIso(readResult, AID_NDEF2, responseData);
+                    boolean selectApplicationIsoSuccess = selectApplicationIso(readResult, AID_NDEF, responseData);
                     writeToUiAppend(readResult, "selectApplication result: " + selectApplicationIsoSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!selectApplicationIsoSuccess) {
                         writeToUiAppend(readResult, "the selectApplicationIso was not successful, aborted");
@@ -258,7 +220,11 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     writeToUiAppend(readResult, "5. MIFARE DESFire WriteData to write the content of the CC File with CCLEN equal to 000Fh");
                     responseData = new byte[2];
                     byte[] dataToWriteByte = "hello".getBytes(StandardCharsets.UTF_8);
-                    boolean writeToStandardFileNdefSuccess = writeToStandardFileNdef(readResult, FILE_ID_01, dataToWriteByte, responseData);
+                    // Command: 90 3D 00 00 16 01 00 00 00 0F 00 00 00 0F 20 00 3A 00 34 04 06 E1 04 08 00 00 00 00h
+                    // Command:                                     00 0F 20 00 3A 00 34 04 06 E1 04 08 00 00 00
+                    byte[] NDEF_CONTAINER = Utils.hexStringToByteArray("000F20003A00340406E10408000000");
+
+                    boolean writeToStandardFileNdefSuccess = writeToStandardFileNdef(readResult, FILE_ID_01, NDEF_CONTAINER, responseData);
                     writeToUiAppend(readResult, "writeToStandardFileNdef result: " + writeToStandardFileNdefSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!writeToStandardFileNdefSuccess) {
                         writeToUiAppend(readResult, "the writeToStandardFileNdef was not successful, aborted");
@@ -269,7 +235,9 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "6. MIFARE DESFire CreateStdDataFile with FileNo equal to 02h");
                     responseData = new byte[2];
-                    boolean createStandardFileIsoStep06Success = createStandardFileIsoStep6(readResult, FILE_ID_02, responseData);
+                    boolean createStandardFileIsoStep06Success = createStandardFileIso(readResult, FILE_ID_02, ISO_FILE_ID_02, PayloadBuilder.CommunicationSetting.Plain,
+                            14, 0, 14, 14, FILE_02_SIZE, responseData);
+                    //boolean createStandardFileIsoStep06Success = createStandardFileIsoStep6(readResult, FILE_ID_02, responseData);
                     writeToUiAppend(readResult, "createStandardFileIsoStep06 result: " + createStandardFileIsoSuccess + " with response: " + Utils.bytesToHex(responseData));
                     if (!createStandardFileIsoStep06Success) {
                         writeToUiAppend(readResult, "the createStandardFileIsoStep06 was not successful, aborted");
@@ -277,11 +245,15 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     }
 
                     // step 07 write to standard file
+
+                    byte[] NDEF_FILE_02 = Utils.hexStringToByteArray("000200000000");
+
                     writeToUiAppend(readResult, "");
                     writeToUiAppend(readResult, "MIFARE DESFire WriteData to write the content of the NDEF File with NLEN equal to 0000h");
                     responseData = new byte[2];
                     byte[] dataToWriteByte2 = "hello".getBytes(StandardCharsets.UTF_8);
                     boolean writeToStandardFileNdefStep07Success = writeToStandardFileNdefStep07(readResult, FILE_ID_02, dataToWriteByte2, responseData);
+                    //boolean writeToStandardFileNdefStep07Success = writeToStandardFileNdef(readResult, FILE_ID_02, NDEF_FILE_02, responseData);
                     writeToUiAppend(readResult, "writeToStandardFileNdefStep07 result: " + writeToStandardFileNdefStep07Success + " with response: " + Utils.bytesToHex(responseData));
                     if (!writeToStandardFileNdefStep07Success) {
                         writeToUiAppend(readResult, "the writeToStandardFileNdefStep07 was not successful, aborted");
@@ -313,11 +285,14 @@ Expected Response: 91 00h
 4. MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
 ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh, FileSize bigger equal to 00000Fh
 Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
-NOTE: There is an error in the command, the Access Rights do have a wrong value ("00 E0" instead of "EE EE"
+NOTE: There is an error in the command, the Access Rights do have a wrong value ("00 E0" instead of "EE EE")
 Expected Response: 91 00h
 
-5. MIFARE DESFire WriteData to write the content of the CC File with CCLEN equal
-to 000Fh, Mapping Version equal to 20h, MLe equal to 003Ah, MLc equal to 0034h,
+5. MIFARE DESFire WriteData to write the content of the CC File with
+CCLEN equal to 000Fh,
+Mapping Version equal to 20h,
+MLe equal to 003Ah,
+MLc equal to 0034h,
 and NDEF File Control TLV equal to: T=04h, L=06h, V=E1 04 (NDEF ISO FID = E104h) 08 00
 (NDEF File size = 2048 Bytes) 00 (free read access) 00 (free write access)
 Command: 90 3D 00 00 16 01 00 00 00 0F 00 00 00 0F 20 00 3A 00 34 04 06 E1 04 08 00 00 00 00h
@@ -357,6 +332,142 @@ Expected Response: XX XX XX SW XX SS XX 91 AFh
 Command: 90 AF 00 00 00h
 ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
 
+ */
+
+/*
+see Configure MIFARE DESFire EV1 as NFC Forum Type 4 Tag for NDEF
+https://stackoverflow.com/questions/41249713/configure-mifare-desfire-ev1-as-nfc-forum-type-4-tag-for-ndef
+
+The procedure to prepare MIFARE DESFire EV1 as an NFC Forum Type 4 Tag (V2.0) is not part of the platform
+independend NFC Forum specifications. Instead, this procedure is defined by the chip manufacturer (NXP) in
+their application note AN11004: MIFARE DESFire as Type 4 Tag. The procedure is about the following:
+
+http://www.nxp.com/documents/application_note/AN11004.pdf
+
+If Android already detects the Ndef tag technology, you are done. Since Android tries to detect the NDEF tag
+application and an NDEF message contained in the NDEF data file, finding the Ndef tag technology means that
+the tag is already prepared for NDEF (i.e. it already is configured as NFC Forum Type 4 Tag).
+
+Else, you would check if the tag really is a DESFire EV1 tag. You can do this based on the type identification
+procedure described in AN10833: MIFARE Type Identification Procedure and based on the version information
+obtained from the DESFire tag.
+
+Once you know that the tag is a DESFire EV1 tag (and that you have sufficient access to the master application
+in order to apply the necessary modifications to the tag, which may require and authentication step), you would
+first create the NDEF Tag Application. This is a DESFire application that has its ISO 7816-4 DF name (= AID)
+set to D2760000850101 during creation. The values that you chose for the DESFire AID, the ISO file ID are not
+important for proper T4T operation (note that this is different for the pre-EV1 generation of DESFire). The key
+settings depend on your usage scenario. The only other important parameter that you need to set during
+application creation is to allow ISO 7816-4 file identifiers for files within the application (bit 5 in the
+Key Settings 2 byte set to '1').
+
+Select the newly created application.
+
+Create a new standard data file, the capability container file, with a size of 15 bytes. You need to set the
+ISO 7816-4 file ID to E103. Make sure to allow plain communication by setting the Com.Set. byte to 0x00. Set
+the Access Rights field so that you can later modify the file contents during the initialization.
+
+Create another new standard data file, the NDEF data file. If you only use the tag as NDEF tag, you would
+typically use all the remaining available space. Set the ISO 7816-4 file ID to E104. Make sure to allow plain
+communication by setting the Com.Set. byte to 0x00. Set the Access Rights field to 0xE000 for a read-only tag
+or 0xEEE0 for a tag that should allow read and write access through the Ndef tag technology.
+
+Select the capability container file and write the capability container data to it:
+
+000F  20  003A  0034  04 06 E104 xxxx 00 yy
+where xxxx is the size of the NDEF data file and yy is 0x00 if the file is freely writable or 0xFF if the
+file is read-only.
+
+Select the NDEF message file and write the first 2 bytes as 0x0000 (in order to indicate that the file is empty).
+
+Note that creating the NDEF Tag Application structures on a DESFire (EV1) card requires you to use either
+the native or the wrapped native command set of MIFARE DESFire. Since some versions of Android cause known
+problems with the native commands, you are better off using wrapped native commands. You can find details on
+the DESFire command set in the DESFire product datasheets (available only under NDA from NXP).
+ */
+
+/*
+see Write NDEF manually
+https://stackoverflow.com/questions/42105626/writing-ndef-data-to-ntag216-tag-using-low-level-nfc-communication-methods
+
+NTAG216 is an NFC Forum Type 2 tag. Consequently, you have to follow the NFC Forum Type 2 Tag Operation
+specification when writing data to this type of NFC tag.
+
+Therefore, you will need to follow a few rules for a tag to be discoverable as NDEF tag (Type 2 tag):
+
+First, the capability container (located in block 3) needs to be configured.
+
+Byte 0 must be set to the "magic" value 0xE1.
+Byte 1 must be set to 0x10 to indicate mapping version 1.0.
+Byte 2 must be set to 0x6D to indicate the memory size of NTAG216.
+Byte 3 can be set to 0x00 to indicate read/write access to the NDEF data or to 0x0F to indicate read-only access
+(note that these are permissions on the application layer).
+So you can write the capability container as:
+
+byte[] response = nfc.transceive(new byte[] {
+    (byte)0xA2, // WRITE
+    (byte)3,    // block address
+    (byte)0xE1, (byte)0x10, (byte)0x6D, (byte)0x00
+});
+NTAG216 already ships with a properly configured capability container so there is no need to do this by hand. Also
+note that block 3 is one-time-programmable, which means that bits can only be set to one but cannot be cleared to
+zero again. So if you did already overwrite the capability container with a different value, the tag can most
+likely no longer be used as an NDEF tag.
+
+The data must be written to the data blocks starting at block 4. NDEF messages must be wrapped into an NDEF message
+TLV (tag-length-value) structure. The tag for this TLV is 0x03. The length can be either in one-byte format (for
+NDEF messages with a length between 0 and 254 bytes) or in three-byte format (for NDEF messages with a length of
+255 or more bytes). The data of this TLV block is the actual NDEF message (that you can obtain from
+ndefMessage.toByteArray()).
+
+For example, for the NDEF message D1 01 0D 55 01 65 78 61 6D 70 6C 65 2E 63 6F 6D 2F (which is a URI record with
+the URL "http://www.example.com/"), you would get the following TLV structure:
+
+03 11 D1010D55016578616D706C652E636F6D2F
+If you have alonger NDEF message (e.g. one with 259 bytes), you would use the three-byte length format:
+
+03 FF0103 D101FF5501...
+Further, you should mark the end of the data on the tag with a Terminator TLV (tag 0xFE, no length and
+data fields):
+
+FE
+You could then write this data to the tag as:
+
+byte[] ndefMessage = new byte[] {
+    (byte)0xD1, (byte)0x01, (byte)0x0D, (byte)0x55, (byte)0x01, (byte)0x65, (byte)0x78, (byte)0x61, (byte)0x6D, (byte)0x70, (byte)0x6C, (byte)0x65, (byte)0x2E, (byte)0x63, (byte)0x6F, (byte)0x6D, (byte)0x2F
+};
+
+// wrap into TLV structure
+byte[] tlvEncodedData = null;
+if (ndefMessage.length < 255) {
+    tlvEncodedData = new byte[ndefMessage.length + 3];
+    tlvEncodedData[0] = (byte)0x03;  // NDEF TLV tag
+    tlvEncodedData[1] = (byte)(ndefMessage.length & 0x0FF);  // NDEF TLV length (1 byte)
+    System.arraycopy(ndefMessage, 0, tlvEncodedData, 2, ndefMessage.length);
+    tlvEncodedData[2 + ndefMessage.length] = (byte)0xFE;  // Terminator TLV tag
+} else {
+    tlvEncodedData = new byte[ndefMessage.length + 5];
+    tlvEncodedData[0] = (byte)0x03;  // NDEF TLV tag
+    tlvEncodedData[1] = (byte)0xFF;  // NDEF TLV length (3 byte, marker)
+    tlvEncodedData[2] = (byte)((ndefMessage.length >>> 8) & 0x0FF);  // NDEF TLV length (3 byte, hi)
+    tlvEncodedData[3] = (byte)(ndefMessage.length & 0x0FF);          // NDEF TLV length (3 byte, lo)
+    System.arraycopy(ndefMessage, 0, tlvEncodedData, 4, ndefMessage.length);
+    tlvEncodedData[4 + ndefMessage.length] = (byte)0xFE;  // Terminator TLV tag
+}
+
+// fill up with zeros to block boundary:
+tlvEncodedData = Arrays.copyOf(tlvEncodedData, (tlvEncodedData.length / 4 + 1) * 4);
+for (int i = 0; i < tlvEncodedData.length; i += 4) {
+    byte[] command = new byte[] {
+        (byte)0xA2, // WRITE
+        (byte)((4 + i / 4) & 0x0FF), // block address
+        0, 0, 0, 0
+    };
+    System.arraycopy(tlvEncodedData, i, command, 2, 4);
+    byte[] response = nfc.transceive(command);
+}
+Finally, be aware that you can't use the tag as NDEF tag if you have read-password set on the NDEF data
+area since the NFC Forum Type 2 Tag Operation specification requires the tag to be freely readable.
  */
 
 
@@ -422,6 +533,7 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
         }
         writeToUiAppend(logTextView, printData("commandSequence", commandSequence));
         writeToUiAppend(logTextView, printData("command Builder", wrappedCommand));
+        writeToUiAppend(logTextView, "** Arrays equal: " + Arrays.equals(commandSequence, wrappedCommand));
 
 /*
         // create an application
@@ -455,9 +567,19 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
         // todo change this is rough programming
         byte[] commandSequence = Utils.hexStringToByteArray("905A00000301000000");
 
+        byte selectApplicationCommand = (byte) 0x5A;
+        byte[] wrappedCommand = new byte[0];
+        try {
+            wrappedCommand = wrapMessage(selectApplicationCommand, applicationIdentifier);
+        } catch (Exception e) {
+            writeToUiAppend(logTextView, "error on running the selectApplication command " + e.getMessage());
+        }
+        writeToUiAppend(logTextView, printData("commandSequence", commandSequence));
+        writeToUiAppend(logTextView, printData("command Builder", wrappedCommand));
+        writeToUiAppend(logTextView, "Arrays equal: " + Arrays.equals(commandSequence, wrappedCommand));
+
 
         // select application
-        byte selectApplicationCommand = (byte) 0x5a;
         byte[] selectApplicationResponse = new byte[0];
         try {
             selectApplicationResponse = isoDep.transceive(commandSequence);
@@ -509,8 +631,7 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
         }
         writeToUiAppend(logTextView, printData("commandSequence", commandSequence));
         writeToUiAppend(logTextView, printData("command Builder", wrappedCommand));
-
-
+        writeToUiAppend(logTextView, "Arrays equal: " + Arrays.equals(commandSequence, wrappedCommand));
 
         byte[] createStandardFileResponse = new byte[0];
         try {
@@ -578,6 +699,12 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
     }
 
     private boolean writeToStandardFileNdef(TextView logTextView, byte fileNumber, byte[] data, byte[] response) {
+        // some sanity checks to avoid any issues
+        if (fileNumber < (byte) 0x00) return false;
+        if (fileNumber > (byte) 0x0A) return false;
+        if (data == null) return false;
+        if (data.length == 0) return false;
+        if (data.length > 32) return false; // limitation in PayloadBuilder to avoid framing
 
         /*
         MIFARE DESFire WriteData to write the content of the CC File with CCLEN equal to 000Fh,
@@ -586,12 +713,27 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
         08 00 (NDEF File size = 2048 Bytes) 00 (free read access) 00 (free write access)
         Command: 90 3D 00 00 16 01 00 00 00 0F 00 00 00 0F 20 00 3A 00 34 04 06 E1 04 08 00 00 00 00h
          */
-        byte[] commandSequence = Utils.hexStringToByteArray("903D000016010000000F0000000F20003A00340406E1040800000000");
+        //byte[] commandSequence = Utils.hexStringToByteArray("903D000016010000000F0000000F20003A00340406E1040800000000"); // step 05
+        byte[] commandSequence = Utils.hexStringToByteArray("903D00000902000000020000000000"); // step 07
+        byte writeStandardFileCommand = (byte) 0x3D;
+        PayloadBuilder pb = new PayloadBuilder();
+        byte[] commandParameters = pb.writeToStandardFile(fileNumber, data);
+        writeToUiAppend(logTextView, printData("commandParameters", commandParameters));
+        byte[] wrappedCommand = new byte[0];
+        try {
+            wrappedCommand = wrapMessage(writeStandardFileCommand, commandParameters);
+        } catch (Exception e) {
+            writeToUiAppend(logTextView, "error on running the writeStandardFile command " + e.getMessage());
+        }
+        writeToUiAppend(logTextView, printData("commandSequence", commandSequence));
+        writeToUiAppend(logTextView, printData("command Builder", wrappedCommand));
+        writeToUiAppend(logTextView, "** Arrays equal: " + Arrays.equals(commandSequence, wrappedCommand));
+
+
         byte[] writeStandardFileResponse = new byte[0];
         try {
-            writeStandardFileResponse = isoDep.transceive(commandSequence);
-            //writeStandardFileResponse = isoDep.transceive(wrapMessage(writeStandardFileCommand, writeStandardFileParameters));
-            //writeToUiAppend(logTextView, printData("send APDU", wrapMessage(writeStandardFileCommand, writeStandardFileParameters)));
+            writeStandardFileResponse = isoDep.transceive(wrappedCommand);
+            //writeStandardFileResponse = isoDep.transceive(commandSequence);
         } catch (Exception e) {
             //throw new RuntimeException(e);
             writeToUiAppend(logTextView, "transceive failed: " + e.getMessage());
@@ -643,6 +785,28 @@ ExpectedResponse:XXXXXXXXXXXXXXXXXXXXXXXXXX9100
 
     }
 
+    // see https://stackoverflow.com/questions/42105626/writing-ndef-data-to-ntag216-tag-using-low-level-nfc-communication-methods
+    public byte[] generateNdefFile(byte[] ndefMessage) {
+        if (ndefMessage == null) return null;
+        // wrap into TLV structure
+        byte[] tlvEncodedData = null;
+        if (ndefMessage.length < 255) {
+            tlvEncodedData = new byte[ndefMessage.length + 3];
+            tlvEncodedData[0] = (byte)0x03;  // NDEF TLV tag
+            tlvEncodedData[1] = (byte)(ndefMessage.length & 0x0FF);  // NDEF TLV length (1 byte)
+            System.arraycopy(ndefMessage, 0, tlvEncodedData, 2, ndefMessage.length);
+            tlvEncodedData[2 + ndefMessage.length] = (byte)0xFE;  // Terminator TLV tag
+        } else {
+            tlvEncodedData = new byte[ndefMessage.length + 5];
+            tlvEncodedData[0] = (byte)0x03;  // NDEF TLV tag
+            tlvEncodedData[1] = (byte)0xFF;  // NDEF TLV length (3 byte, marker)
+            tlvEncodedData[2] = (byte)((ndefMessage.length >>> 8) & 0x0FF);  // NDEF TLV length (3 byte, hi)
+            tlvEncodedData[3] = (byte)(ndefMessage.length & 0x0FF);          // NDEF TLV length (3 byte, lo)
+            System.arraycopy(ndefMessage, 0, tlvEncodedData, 4, ndefMessage.length);
+            tlvEncodedData[4 + ndefMessage.length] = (byte)0xFE;  // Terminator TLV tag
+        }
+        return tlvEncodedData;
+    }
 
 
 
