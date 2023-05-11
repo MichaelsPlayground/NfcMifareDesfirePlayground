@@ -253,6 +253,8 @@ public class NdefActivity extends AppCompatActivity implements NfcAdapter.Reader
                     responseData = new byte[2];
                     byte[] dataToWriteByte2 = "hello".getBytes(StandardCharsets.UTF_8);
                     boolean writeToStandardFileNdefStep07Success = writeToStandardFileNdefStep07(readResult, FILE_ID_02, dataToWriteByte2, responseData);
+
+                    // todo THIS IS NOT WORKING !!
                     //boolean writeToStandardFileNdefStep07Success = writeToStandardFileNdef(readResult, FILE_ID_02, NDEF_FILE_02, responseData);
                     writeToUiAppend(readResult, "writeToStandardFileNdefStep07 result: " + writeToStandardFileNdefStep07Success + " with response: " + Utils.bytesToHex(responseData));
                     if (!writeToStandardFileNdefStep07Success) {
