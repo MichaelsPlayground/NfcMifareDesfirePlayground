@@ -483,6 +483,61 @@ area since the NFC Forum Type 2 Tag Operation specification requires the tag to 
         btn3.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                // this is just for testing NDEF data
+
+                writeToUiAppend(readResult, "");
+                writeToUiAppend(readResult, "MIFARE DESFire WriteData to write the content of the NDEF File with NLEN equal to 0000h");
+
+                //byte FILE_ID_02 = (byte) 0x02;
+                byte fileNumber = (byte) 0x02;
+
+                //byte[] NDEF_FILE_02 = Utils.hexStringToByteArray("000200000000");
+                byte[] data = Utils.hexStringToByteArray("000200000000");
+
+
+                byte[] commandSequence = Utils.hexStringToByteArray("903D00000902000000020000000000"); // step 07
+                byte writeStandardFileCommand = (byte) 0x3D;
+                PayloadBuilder pb = new PayloadBuilder();
+                byte[] commandParameters = pb.writeToStandardFile(fileNumber, data);
+                writeToUiAppend(readResult, printData("commandParameters", commandParameters));
+                byte[] wrappedCommand = new byte[0];
+                try {
+                    wrappedCommand = wrapMessage(writeStandardFileCommand, commandParameters);
+                } catch (Exception e) {
+                    writeToUiAppend(readResult, "error on running the writeStandardFile command " + e.getMessage());
+                }
+                writeToUiAppend(readResult, printData("commandSequence", commandSequence));
+                writeToUiAppend(readResult, printData("command Builder", wrappedCommand));
+                writeToUiAppend(readResult, "** Arrays equal: " + Arrays.equals(commandSequence, wrappedCommand));
+/*
+MIFARE DESFire WriteData to write the content of the NDEF File with NLEN equal to 0000h
+commandParameters length: 13 data: 02000000060000000200000000
+commandSequence length: 15 data: 903d00000902000000020000000000
+command Builder length: 19 data: 903d00000d0200000006000000020000000000
+commandParameters length: 13 data:         02000000060000000200000000
+commandSequence length: 15 data: 90
+                                    3d
+                                      00 00
+                                           09 length
+                                             02 file number
+                                               00 00 00 offset
+                                                       02 00 00 // length 2 byte, empty
+                                                               00 00 // data 00 (free read access) 00 (free write access)
+                                                                    00 end
+
+
+
+** Arrays equal: false
+
+ */
+
+
+/*
+    step 07
+        MIFARE DESFire WriteData to write the content of the NDEF File with NLEN equal to 0000h,
+        and no NDEF Message
+        Command: 90 3D 00 00 09 02 00 00 00 02 00 00 00 00 00h
+ */
 
             }
         });
