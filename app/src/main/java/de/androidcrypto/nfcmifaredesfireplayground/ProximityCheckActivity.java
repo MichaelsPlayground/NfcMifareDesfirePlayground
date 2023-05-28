@@ -45,9 +45,9 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
 
 
     //Button vcConfKeySettings, vcConfKeySet;
-    Button pcGetVcConfigKeySettings, pcSetVcConfigurationKey;
+    Button pcGetVcConfigKeySettings, pcSetVcConfigurationKeyDes, pcSetVcConfigurationKeyAes;
     Button pcGetVcProxKeySettings, pcSetVcProxKey;
-    Button authWithVcConfKey;
+    Button pcAuthWithVcConfKey, pcAuthWithVcProxKey;
 
     Button pcSelectMasterApplication, pcAuthMasterApplicationDes, pcAuthMasterApplicationAes;
 
@@ -97,10 +97,12 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
         tagId = findViewById(R.id.etPcTagId);
 
         pcGetVcConfigKeySettings = findViewById(R.id.btnVcConfKeySettings);
-        pcSetVcConfigurationKey = findViewById(R.id.btnVcConfKeySet);
+        pcSetVcConfigurationKeyDes = findViewById(R.id.btnVcConfKeySetDes);
+        pcSetVcConfigurationKeyAes = findViewById(R.id.btnVcConfKeySetAes);
         pcGetVcProxKeySettings = findViewById(R.id.btnVcProxKeySettings);
         pcSetVcProxKey = findViewById(R.id.btnVcProxKeySet);
-        authWithVcConfKey = findViewById(R.id.btnVcConfKeyAuth);
+        pcAuthWithVcConfKey = findViewById(R.id.btnVcConfKeyAuth);
+        pcAuthWithVcProxKey = findViewById(R.id.btnVcProxKeyAuth);
 
         pcSelectMasterApplication = findViewById(R.id.btnSelectMasterApplication);
         pcAuthMasterApplicationDes = findViewById(R.id.btnAuthMasterApplicationDes);
@@ -129,11 +131,11 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
             }
         });
 
-        pcSetVcConfigurationKey.setOnClickListener(new View.OnClickListener() {
+        pcSetVcConfigurationKeyDes.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 // this will set a new key
-                writeToUiAppend(pcResult, "write the VC configuration key (0x20)");
+                writeToUiAppend(pcResult, "write the VC configuration key (0x20) DES");
                 DESFireEV1 desfire = new DESFireEV1();
                 desfire.setAdapter(desFireAdapter);
 
@@ -160,17 +162,49 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
             }
         });
 
-        authWithVcConfKey.setOnClickListener(new View.OnClickListener() {
+        pcSetVcConfigurationKeyAes.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // this will set a new key
+                writeToUiAppend(pcResult, "write the VC configuration key (0x20) AES");
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
+
+                byte[] oldKey = new byte[16];
+
+                try {
+                    boolean dfSelectM = desfire.selectApplication(AID_Master);
+                    writeToUiAppend(pcResult, "dfSelectMasterApplication result: " + dfSelectM);
+
+                    boolean dfAuthM = desfire.authenticate(AES_KEY, AES_KEY_NUMBER, KeyType.AES);
+                    writeToUiAppend(pcResult, "dfAuthenticateMasterApplication result: " + dfAuthM);
+                    byte[] sessionKey = desfire.getSkey();
+                    writeToUiAppend(pcResult, printData("sessionkey", sessionKey));
+
+                    desfire.setKtype(KeyType.AES);
+                    boolean result = desfire.changeKeyWithoutValidation(VC_CONFIG_KEY_NUMBER, (byte) 0, KeyType.AES, VC_CONFIG_KEY, oldKey, sessionKey);
+                    writeToUiAppend(pcResult, "setKey: " + result);
+                } catch (IOException e) {
+                    //throw new RuntimeException(e);
+                    writeToUiAppend(pcResult, "Exception on setKey: " + e.getMessage());
+                }
+
+
+            }
+        });
+
+        pcAuthWithVcConfKey.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 // run an AES authorization with the VcConfigKey
+                /*
                 writeToUiAppend(pcResult, "authenticate the VC Config key (0x20)");
                 byte[] response = new byte[0];
                 boolean result = authenticateAes(pcResult, VC_CONFIG_KEY_NUMBER, VC_CONFIG_KEY, true, response);
                 writeToUiAppend(pcResult, "Auth VC CONFIGURATION KEY result: " + result);
                 writeToUiAppend(pcResult, printData("response", response));
+*/
 
-                /*
                 DESFireEV1 desfire = new DESFireEV1();
                 desfire.setAdapter(desFireAdapter);
                 try {
@@ -180,7 +214,32 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                     //throw new RuntimeException(e);
                     writeToUiAppend(pcResult, "Exception on auth key: " + e.getMessage());
                 }
-                */
+
+            }
+        });
+
+        pcAuthWithVcProxKey.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // run an AES authorization with the VcConfigKey
+                /*
+                writeToUiAppend(pcResult, "authenticate the VC Config key (0x20)");
+                byte[] response = new byte[0];
+                boolean result = authenticateAes(pcResult, VC_CONFIG_KEY_NUMBER, VC_CONFIG_KEY, true, response);
+                writeToUiAppend(pcResult, "Auth VC CONFIGURATION KEY result: " + result);
+                writeToUiAppend(pcResult, printData("response", response));
+*/
+
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
+                try {
+                    boolean result = desfire.authenticate(VC_PROXIMITY_KEY, VC_PROXIMITY_KEY_NUMBER, KeyType.AES);
+                    writeToUiAppend(pcResult, "Auth VC PROXIMITY KEY result: " + result);
+                } catch (IOException e) {
+                    //throw new RuntimeException(e);
+                    writeToUiAppend(pcResult, "Exception on auth key: " + e.getMessage());
+                }
+
             }
         });
 

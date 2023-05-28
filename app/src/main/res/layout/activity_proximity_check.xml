@@ -66,7 +66,7 @@
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
             android:padding="10dp"
-            android:text="VC Configuration Key"
+            android:text="VC Configuration Key DES"
             android:textAlignment="center"
             android:textSize="16sp"
             android:textStyle="normal" />
@@ -87,12 +87,48 @@
                 android:text="VC conf key settings" />
 
             <Button
-                android:id="@+id/btnVcConfKeySet"
+                android:id="@+id/btnVcConfKeySetDes"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="8dp"
                 android:layout_weight="1"
-                android:text="set VC conf key" />
+                android:text="set VC conf key DES" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvPcStep01b"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:padding="10dp"
+            android:text="VC Configuration Key AES"
+            android:textAlignment="center"
+            android:textSize="16sp"
+            android:textStyle="normal" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnVcConfKeySettingsAes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="8dp"
+                android:layout_weight="1"
+                android:text="VC conf key settings" />
+
+            <Button
+                android:id="@+id/btnVcConfKeySetAes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="8dp"
+                android:layout_weight="1"
+                android:text="set VC conf key AES" />
         </LinearLayout>
 
         <TextView
@@ -138,7 +174,7 @@
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
             android:padding="10dp"
-            android:text="auth with VC Configuration Key"
+            android:text="auth with VC Conf / Prox Key"
             android:textAlignment="center"
             android:textSize="16sp"
             android:textStyle="normal" />
@@ -159,12 +195,12 @@
                 android:text="auth with VC conf key" />
 
             <Button
-                android:id="@+id/btnVcConfKeySetX"
+                android:id="@+id/btnVcProxKeyAuth"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="8dp"
                 android:layout_weight="1"
-                android:text="xxx" />
+                android:text="auth with VC prox key" />
         </LinearLayout>
 
         <TextView
