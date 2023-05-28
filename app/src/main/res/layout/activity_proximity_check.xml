@@ -167,6 +167,79 @@
                 android:text="xxx" />
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/tvPcStep0x"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:padding="10dp"
+            android:text="MasterApplication DES"
+            android:textAlignment="center"
+            android:textSize="16sp"
+            android:textStyle="normal" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSelectMasterApplication"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="8dp"
+                android:layout_weight="1"
+                android:text="select Master App" />
+
+            <Button
+                android:id="@+id/btnAuthMasterApplicationDes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="8dp"
+                android:layout_weight="1"
+                android:text="DES auth Master App" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvPcStep01x"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:padding="10dp"
+            android:text="MasterApplication AES"
+            android:textAlignment="center"
+            android:textSize="16sp"
+            android:textStyle="normal" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSelectMasterApplicationAes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="8dp"
+                android:layout_weight="1"
+                android:text="xx" />
+
+            <Button
+                android:id="@+id/btnAuthMasterApplicationAes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="8dp"
+                android:layout_weight="1"
+                android:text="AES auth Master App" />
+        </LinearLayout>
+
+
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/etPcResultLayout"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
