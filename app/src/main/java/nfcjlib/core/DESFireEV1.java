@@ -445,7 +445,7 @@ public class DESFireEV1 {
 				plaintext[i] ^= oldKey[i % oldKey.length];
 			}
 		}
-
+		Log.d(TAG, "plaintext after xor-ing: " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
 		byte[] tmpForCRC;
 		byte[] crc;
 		int addAesKeyVersionByte = type == KeyType.AES ? 1 : 0;
@@ -460,6 +460,7 @@ public class DESFireEV1 {
 				crc = CRC16.get(newKey);
 				System.arraycopy(crc, 0, plaintext, nklen + addAesKeyVersionByte + 2, 2);
 			}
+			Log.d(TAG, "plaintext after CRC16 : " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
 
 			// ### this is a fixed command for changing the key 0x20
 			Log.d(TAG, "plaintext before fixing: " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
@@ -470,7 +471,63 @@ public class DESFireEV1 {
 			plaintext = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray(cmdFixed);
 			Log.d(TAG, "plaintext after fixing:  " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
 
+			// ### this is the data from the nxp_d40_crypto_example
+			/*
+			def nxp_d40_crypto_example():
+  #print("nxp_d40_crypto_example")
+	prevkey = "01020304050607080910111213141516"
+	newkey = "F0E1D2C3B4A596870F1E2D3C4B5A6978"
+	xored = hex(int(prevkey, 16) ^ int(newkey, 16))
+	prevkey = bytes.fromhex(prevkey)
+	newkey = bytes.fromhex(newkey)
+	CRC16 = "6472"
+	CRC16NK = "5E54"
+	plaincryptogram = xored[2:] + CRC16 + CRC16NK + "00000000" #Table 59 example
+#plaincryptogram = "B0B1B2B3B4B5B6B7B8B9BABBBCBDBEBF2038000000000000" #Table 60 example
+#print("plaincryptogram = ", plaincryptogram)
+	#Manually split plaincryptogram into three 8-byte segments to later be fed into the Triple DES cipher
+	plaincryptogram1 = plaincryptogram[0:16]
+	plaincryptogram1 = bytes.fromhex(plaincryptogram1)
+	plaincryptogram2 = plaincryptogram[16:32]
+	plaincryptogram2 = bytes.fromhex(plaincryptogram2)
+	plaincryptogram3 = plaincryptogram[32:48]
+	plaincryptogram3 = bytes.fromhex(plaincryptogram3)
+	plaincryptogram = bytes.fromhex(plaincryptogram)
+	AuthKey = "1C94D15B507F862C6DD3C3BEF2C8FA75"
+	Cryptogram = "35e431b4be541c0a5f5fbd8107e2f324e2cd891a0acd4d5d" = 24 bytes
+			 */
+			byte[] oldKeyE = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("01020304050607080910111213141516");
+			byte[] newKeyE = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("F0E1D2C3B4A596870F1E2D3C4B5A6978");
+			byte[] crc16E = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("6472");
+			byte[] crc16NkE = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("5E54");
+			byte[] footer = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("00000000");
+			byte[] authKeyE = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("1C94D15B507F862C6DD3C3BEF2C8FA75");
+			byte[] cryptogramE = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("35e431b4be541c0a5f5fbd8107e2f324e2cd891a0acd4d5d");
+
+			byte[] plaintextE = Arrays.copyOfRange(oldKeyE, 0, oldKeyE.length);
+			for (int i = 0; i < newKeyE.length; i++) {
+				plaintextE[i] ^= newKeyE[i % newKeyE.length];
+			}
+			Log.d(TAG, "oldKeyE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(oldKeyE) + " length: " + oldKeyE.length);
+			Log.d(TAG, "newKeyE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(newKeyE) + " length: " + newKeyE.length);
+			Log.d(TAG, "plaintE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(plaintextE) + " length: " + plaintextE.length);
+			Log.d(TAG, "crc16E : " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(crc16E) + " length: " + crc16E.length);
+			Log.d(TAG, "crc16NE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(crc16NkE) + " length: " + crc16NkE.length);
+			Log.d(TAG, "footerE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(footer) + " length: " + footer.length);
+			Log.d(TAG, "autKeyE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(authKeyE) + " length: " + authKeyE.length);
+			Log.d(TAG, "expCryE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(cryptogramE) + " length: " + cryptogramE.length);
+			byte[] plaintextFullE = new byte[24];
+			System.arraycopy(plaintextE, 1, plaintextFullE, 0, plaintextE.length - 1);
+			System.arraycopy(crc16E, 0, plaintextFullE, 15, crc16E.length);
+			System.arraycopy(crc16NkE, 0, plaintextFullE, 17, crc16NkE.length);
+			System.arraycopy(footer, 0, plaintextFullE, 19, footer.length);
+			Log.d(TAG, "ptFullE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(plaintextFullE) + " length: " + plaintextFullE.length);
+			byte[] ciphertextE = send(authKeyE, plaintext, ktype, null);
+			Log.d(TAG, "expCryE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(cryptogramE) + " length: " + cryptogramE.length);
+			Log.d(TAG, "ciphTxE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(ciphertextE) + " length: " + ciphertextE.length);
+
 			ciphertext = send(sessionKey, plaintext, ktype, null);
+
 			break;
 		case TKTDES:
 		case AES:
