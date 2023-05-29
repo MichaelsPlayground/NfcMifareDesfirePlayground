@@ -453,6 +453,7 @@ public class DESFireEV1 {
 		switch (ktype) {
 		case DES:
 		case TDES:
+			Log.d(TAG, "case DES/TDES");
 			crc = CRC16.get(plaintext, 0, nklen + addAesKeyVersionByte);
 			System.arraycopy(crc, 0, plaintext, nklen + addAesKeyVersionByte, 2);
 
@@ -463,6 +464,7 @@ public class DESFireEV1 {
 			Log.d(TAG, "plaintext after CRC16 : " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
 
 			// ### this is a fixed command for changing the key 0x20
+			/*
 			Log.d(TAG, "plaintext before fixing: " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
 			String cmdFixed = "00000000000000000000000000000000" + "00"; // DES key + key version  17 bytes (17 bytes)
 			cmdFixed += "7545"; // CRC16, CRC of "0x00*16 0x00" = 0x75 0x45                         2 bytes (19 bytes)
@@ -470,7 +472,7 @@ public class DESFireEV1 {
 			cmdFixed += "000000"; // Pad 3 bytes to get to 24 bytes                                 3 bytes (24 bytes)
 			plaintext = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray(cmdFixed);
 			Log.d(TAG, "plaintext after fixing:  " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
-
+*/
 			// ### this is the data from the nxp_d40_crypto_example
 			/*
 			def nxp_d40_crypto_example():
@@ -496,6 +498,7 @@ public class DESFireEV1 {
 	AuthKey = "1C94D15B507F862C6DD3C3BEF2C8FA75"
 	Cryptogram = "35e431b4be541c0a5f5fbd8107e2f324e2cd891a0acd4d5d" = 24 bytes
 			 */
+/*
 			byte[] oldKeyE = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("01020304050607080910111213141516");
 			byte[] newKeyE = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("F0E1D2C3B4A596870F1E2D3C4B5A6978");
 			byte[] crc16E = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray("6472");
@@ -525,12 +528,14 @@ public class DESFireEV1 {
 			byte[] ciphertextE = send(authKeyE, plaintext, ktype, null);
 			Log.d(TAG, "expCryE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(cryptogramE) + " length: " + cryptogramE.length);
 			Log.d(TAG, "ciphTxE: " + de.androidcrypto.nfcmifaredesfireplayground.Utils.bytesToHex(ciphertextE) + " length: " + ciphertextE.length);
+*/
 
 			ciphertext = send(sessionKey, plaintext, ktype, null);
-
+			Log.d(TAG, "ciphertext after sending: " + Utils.getHexString(ciphertext, true) + "length: " + ciphertext.length);
 			break;
 		case TKTDES:
 		case AES:
+			Log.d(TAG, "case TDES/AES");
 			tmpForCRC = new byte[1 + 1 + nklen + addAesKeyVersionByte];
 			tmpForCRC[0] = (byte) Command.CHANGE_KEY.getCode();
 			tmpForCRC[1] = keyNo;
@@ -556,13 +561,13 @@ public class DESFireEV1 {
 		apdu[4] = (byte) (1 + plaintext.length);
 		apdu[5] = keyNo;
 		System.arraycopy(ciphertext, 0, apdu, 6, ciphertext.length);
+		Log.d(TAG, "complete apdu for transmitting: " + Utils.getHexString(apdu, true) + "length: " + apdu.length);
 		byte[] responseAPDU = transmit(apdu);
 		this.code = getSW2(responseAPDU);
 		feedback(apdu, responseAPDU);
 
 		Log.d(TAG, "plaintext after fixing: " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
 		Log.d(TAG, "code=SW2: " + this.code);
-		Log.d(TAG, "plaintext was: " + Utils.getHexString(plaintext, true));
 
 		if (this.code != 0x00)
 			return false;
@@ -572,7 +577,6 @@ public class DESFireEV1 {
 			if (postprocess(responseAPDU, DesfireFileCommunicationSettings.PLAIN) == null)
 				return false;
 		}
-
 		return true;
 	}
 
