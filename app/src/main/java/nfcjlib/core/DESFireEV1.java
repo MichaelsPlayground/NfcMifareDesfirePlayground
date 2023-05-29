@@ -312,6 +312,66 @@ public class DESFireEV1 {
 
 	// version is 1 separate byte for AES, and the LSBit of each byte for DES keys
 	private boolean changeKey(byte keyNo, byte keyVersion, KeyType type, byte[] newKey, byte[] oldKey, byte[] sessionKey) throws IOException {
+		/*
+		// some manual steps
+		if (!validateKey(newKey, type)) {
+			Log.e(TAG, "Error on validateKey (changeKey: check your args)");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+		if (Arrays.equals(aid, new byte[3]) && keyNo != 0x00) {
+			Log.e(TAG, "Error on Arrays.equals(aid, new byte[3]) && keyNo != 0x00");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+
+		if (kno != (keyNo & 0x0F)) {
+			Log.e(TAG, "Error on kno != (keyNo & 0x0F)");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+		if (oldKey == null) {
+			Log.e(TAG, "Error on oldKey == null");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+		if (ktype == KeyType.DES && oldKey.length != 8) {
+			Log.e(TAG, "Error on ktype == KeyType.DES && oldKey.length != 8");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+		if (ktype == KeyType.TDES && oldKey.length != 16) {
+			Log.e(TAG, "Error on ktype == KeyType.TDES && oldKey.length != 16");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+		if (ktype == KeyType.TKTDES && oldKey.length != 24) {
+			Log.e(TAG, "Error on ktype == KeyType.TKTDES && oldKey.length != 24");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+		if (ktype == KeyType.AES && oldKey.length != 16) {
+			Log.e(TAG, "Error on ktype == KeyType.AES && oldKey.length != 16");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+		 */
+
+		if (!validateKey(newKey, type)
+				// left out this step as we want to change key 0x20 and 0x21 as well
+				// || Arrays.equals(aid, new byte[3]) && keyNo != 0x00
+				|| kno != (keyNo & 0x0F)
+				&& (oldKey == null
+				|| ktype == KeyType.DES && oldKey.length != 8
+				|| ktype == KeyType.TDES && oldKey.length != 16
+				|| ktype == KeyType.TKTDES && oldKey.length != 24
+				|| ktype == KeyType.AES && oldKey.length != 16)) {
+			// basic checks to mitigate the possibility of messing up the keys
+			Log.e(TAG, "You're doing it wrong, chief! (changeKey: check your args)");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+/*
 		if (!validateKey(newKey, type)
 				|| Arrays.equals(aid, new byte[3]) && keyNo != 0x00
 				|| kno != (keyNo & 0x0F)
@@ -325,6 +385,10 @@ public class DESFireEV1 {
 			this.code = Response.WRONG_ARGUMENT.getCode();
 			return false;
 		}
+*/
+
+		Log.d(TAG, "type : " + type.name());
+		Log.d(TAG, "ktype: " + ktype.name());
 
 		byte[] plaintext = null;
 		byte[] ciphertext = null;
@@ -354,17 +418,25 @@ public class DESFireEV1 {
 			newKey = Arrays.copyOfRange(plaintext, 0, 16);
 		}
 
+		Log.d(TAG, "plaintext before xor-ing: " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
+
+		// changed to been able to change the keys 0x20 and 0x21
 		// tweak for when changing PICC master key
-		if (Arrays.equals(aid, new byte[3])) {
-			switch (type) {
-			case TKTDES:
-				keyNo = 0x40;
-				break;
-			case AES:
-				keyNo = (byte) 0x80;
-				break;
-			default:
-				break;
+		if ((keyNo == (byte) 0x20) || (keyNo == (byte) 0x21)) {
+			Log.d(TAG, "we are going to change keys 0x20 or 0x21, so we don't change the keyNumber");
+		} else {
+			Log.d(TAG, "we are NOT going to change keys 0x20 or 0x21, so we change the keyNumber according to the KeyType");
+			if (Arrays.equals(aid, new byte[3])) {
+				switch (type) {
+					case TKTDES:
+						keyNo = 0x40;
+						break;
+					case AES:
+						keyNo = (byte) 0x80;
+						break;
+					default:
+						break;
+				}
 			}
 		}
 
@@ -389,6 +461,15 @@ public class DESFireEV1 {
 				System.arraycopy(crc, 0, plaintext, nklen + addAesKeyVersionByte + 2, 2);
 			}
 
+			// ### this is a fixed command for changing the key 0x20
+			Log.d(TAG, "plaintext before fixing: " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
+			String cmdFixed = "00000000000000000000000000000000" + "00"; // DES key + key version  17 bytes (17 bytes)
+			cmdFixed += "7545"; // CRC16, CRC of "0x00*16 0x00" = 0x75 0x45                         2 bytes (19 bytes)
+			cmdFixed += "3749"; // CRC16NK, CRC of "0x00*16" = 0x37 0x49                            2 bytes (21 bytes)
+			cmdFixed += "000000"; // Pad 3 bytes to get to 24 bytes                                 3 bytes (24 bytes)
+			plaintext = de.androidcrypto.nfcmifaredesfireplayground.Utils.hexStringToByteArray(cmdFixed);
+			Log.d(TAG, "plaintext after fixing:  " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
+
 			ciphertext = send(sessionKey, plaintext, ktype, null);
 			break;
 		case TKTDES:
@@ -410,6 +491,134 @@ public class DESFireEV1 {
 			break;
 		default:
 			assert false : ktype; // should never be reached
+		}
+
+		byte[] apdu = new byte[5 + 1 + ciphertext.length + 1];
+		apdu[0] = (byte) 0x90;
+		apdu[1] = (byte) Command.CHANGE_KEY.getCode();
+		apdu[4] = (byte) (1 + plaintext.length);
+		apdu[5] = keyNo;
+		System.arraycopy(ciphertext, 0, apdu, 6, ciphertext.length);
+		byte[] responseAPDU = transmit(apdu);
+		this.code = getSW2(responseAPDU);
+		feedback(apdu, responseAPDU);
+
+		Log.d(TAG, "plaintext after fixing: " + Utils.getHexString(plaintext, true) + "length: " + plaintext.length);
+		Log.d(TAG, "code=SW2: " + this.code);
+		Log.d(TAG, "plaintext was: " + Utils.getHexString(plaintext, true));
+
+		if (this.code != 0x00)
+			return false;
+		if ((keyNo & 0x0F) == kno) {
+			reset();
+		} else {
+			if (postprocess(responseAPDU, DesfireFileCommunicationSettings.PLAIN) == null)
+				return false;
+		}
+
+		return true;
+	}
+
+
+	private boolean changeKeyOrg(byte keyNo, byte keyVersion, KeyType type, byte[] newKey, byte[] oldKey, byte[] sessionKey) throws IOException {
+		if (!validateKey(newKey, type)
+				|| Arrays.equals(aid, new byte[3]) && keyNo != 0x00
+				|| kno != (keyNo & 0x0F)
+				&& (oldKey == null
+				|| ktype == KeyType.DES && oldKey.length != 8
+				|| ktype == KeyType.TDES && oldKey.length != 16
+				|| ktype == KeyType.TKTDES && oldKey.length != 24
+				|| ktype == KeyType.AES && oldKey.length != 16)) {
+			// basic checks to mitigate the possibility of messing up the keys
+			Log.e(TAG, "You're doing it wrong, chief! (changeKey: check your args)");
+			this.code = Response.WRONG_ARGUMENT.getCode();
+			return false;
+		}
+
+		byte[] plaintext = null;
+		byte[] ciphertext = null;
+		int nklen = type == KeyType.TKTDES ? 24 : 16;  // length of new key
+
+		switch (ktype) {
+			case DES:
+			case TDES:
+				plaintext = type == KeyType.TKTDES ? new byte[32] : new byte[24];
+				break;
+			case TKTDES:
+			case AES:
+				plaintext = new byte[32];
+				break;
+			default:
+				assert false : ktype; // this point should never be reached
+		}
+		if (type == KeyType.AES) {
+			plaintext[16] = keyVersion;
+		} else {
+			setKeyVersion(newKey, 0, newKey.length, keyVersion);
+		}
+		System.arraycopy(newKey, 0, plaintext, 0, newKey.length);
+		if (type == KeyType.DES) {
+			// 8-byte DES keys accepted: internally have to be handled w/ 16 bytes
+			System.arraycopy(newKey, 0, plaintext, 8, newKey.length);
+			newKey = Arrays.copyOfRange(plaintext, 0, 16);
+		}
+
+		// tweak for when changing PICC master key
+		if (Arrays.equals(aid, new byte[3])) {
+			switch (type) {
+				case TKTDES:
+					keyNo = 0x40;
+					break;
+				case AES:
+					keyNo = (byte) 0x80;
+					break;
+				default:
+					break;
+			}
+		}
+
+		if ((keyNo & 0x0F) != kno) {
+			for (int i = 0; i < newKey.length; i++) {
+				plaintext[i] ^= oldKey[i % oldKey.length];
+			}
+		}
+
+		byte[] tmpForCRC;
+		byte[] crc;
+		int addAesKeyVersionByte = type == KeyType.AES ? 1 : 0;
+
+		switch (ktype) {
+			case DES:
+			case TDES:
+				crc = CRC16.get(plaintext, 0, nklen + addAesKeyVersionByte);
+				System.arraycopy(crc, 0, plaintext, nklen + addAesKeyVersionByte, 2);
+
+				if ((keyNo & 0x0F) != kno) {
+					crc = CRC16.get(newKey);
+					System.arraycopy(crc, 0, plaintext, nklen + addAesKeyVersionByte + 2, 2);
+				}
+
+				ciphertext = send(sessionKey, plaintext, ktype, null);
+				break;
+			case TKTDES:
+			case AES:
+				tmpForCRC = new byte[1 + 1 + nklen + addAesKeyVersionByte];
+				tmpForCRC[0] = (byte) Command.CHANGE_KEY.getCode();
+				tmpForCRC[1] = keyNo;
+				System.arraycopy(plaintext, 0, tmpForCRC, 2, nklen + addAesKeyVersionByte);
+				crc = CRC32.get(tmpForCRC);
+				System.arraycopy(crc, 0, plaintext, nklen + addAesKeyVersionByte, crc.length);
+
+				if ((keyNo & 0x0F) != kno) {
+					crc = CRC32.get(newKey);
+					System.arraycopy(crc, 0, plaintext, nklen + addAesKeyVersionByte + 4, crc.length);
+				}
+
+				ciphertext = send(sessionKey, plaintext, ktype, iv);
+				iv = Arrays.copyOfRange(ciphertext, ciphertext.length - iv.length, ciphertext.length);
+				break;
+			default:
+				assert false : ktype; // should never be reached
 		}
 
 		byte[] apdu = new byte[5 + 1 + ciphertext.length + 1];
@@ -2781,6 +2990,18 @@ public class DESFireEV1 {
 	// new
 	public byte[] getSkey() {
 		return skey;
+	}
+
+	public void setSkey(byte[] skey) {
+		this.skey = skey;
+	}
+
+	public byte[] getIv() {
+		return iv;
+	}
+
+	public void setIv(byte[] iv) {
+		this.iv = iv;
 	}
 
 	public void setKtype(KeyType ktype) {

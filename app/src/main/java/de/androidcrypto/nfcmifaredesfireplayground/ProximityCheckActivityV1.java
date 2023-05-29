@@ -1,11 +1,6 @@
 package de.androidcrypto.nfcmifaredesfireplayground;
 
-import static com.github.skjolber.desfire.libfreefare.MifareDesfire.mifare_desfire_tag_new;
-
 import static nfcjlib.core.DESFireEV1.validateKey;
-
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
 import android.nfc.NfcAdapter;
@@ -19,13 +14,13 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.github.skjolber.desfire.ev1.model.DesfireApplicationKeySettings;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+
 import com.github.skjolber.desfire.ev1.model.DesfireTag;
 import com.github.skjolber.desfire.ev1.model.command.DefaultIsoDepWrapper;
 import com.github.skjolber.desfire.ev1.model.command.IsoDepWrapper;
-import com.github.skjolber.desfire.libfreefare.MifareTag;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -41,7 +36,7 @@ import nfcjlib.core.KeyType;
 import nfcjlib.core.util.AES;
 import nfcjlib.core.util.TripleDES;
 
-public class ProximityCheckActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback {
+public class ProximityCheckActivityV1 extends AppCompatActivity implements NfcAdapter.ReaderCallback {
 
 
     //Button vcConfKeySettings, vcConfKeySet;
@@ -50,8 +45,6 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
     Button pcAuthWithVcConfKey, pcAuthWithVcProxKey;
 
     Button pcSelectMasterApplication, pcAuthMasterApplicationDes, pcAuthMasterApplicationAes;
-
-    Button pcChangeMasterKeyToDes;
 
     Button btn38;
 
@@ -65,7 +58,6 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
 
     private DesfireTag desfireTag;
     //private DefaultIsoDepAdapter defaultIsoDepAdapter;
-    DESFireEV1 desfire = new DESFireEV1();
     private DESFireAdapter desFireAdapter;
 
     /**
@@ -77,8 +69,8 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
     byte[] DES_KEY = new byte[8]; // for the master application
     byte DES_KEY_NUMBER = (byte) 0x00;
     byte[] AES_KEY = new byte[16]; // for the master application
-    //byte AES_KEY_NUMBER = (byte) 0x00;
-    byte[] OLD_DES_KEY = new byte[16];
+    byte AES_KEY_NUMBER = (byte) 0x00;
+
     byte[] VC_CONFIG_KEY = new byte[16];
     byte VC_CONFIG_KEY_NUMBER = (byte) 0x20;
     byte[] VC_PROXIMITY_KEY = new byte[16];
@@ -119,9 +111,6 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
 
         pcSetVcProxKey = findViewById(R.id.btnVcProxKeySet);
 
-        pcChangeMasterKeyToDes = findViewById(R.id.btnChangeMasterKeyToDes);
-
-
         pcResult = findViewById(R.id.etPcResult);
 
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
@@ -137,6 +126,8 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                 writeToUiAppend(pcResult,"");
                 writeToUiAppend(pcResult, "get the VC configuration key version (0x20)");
 
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
                 try {
                     byte keyVersion = desfire.getKeyVersion(VC_CONFIG_KEY_NUMBER);
                     writeToUiAppend(pcResult, "getVcConfKeyVersion: " + keyVersion);
@@ -156,6 +147,8 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                 writeToUiAppend(pcResult,"");
                 writeToUiAppend(pcResult, "get the VC proximity check key version (0x21)");
 
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
                 try {
                     byte keyVersion = desfire.getKeyVersion(VC_PROXIMITY_KEY_NUMBER);
                     writeToUiAppend(pcResult, "getVcProxKeyVersion: " + keyVersion);
@@ -190,34 +183,17 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
         pcAuthMasterApplicationDes.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
-                writeToUiAppend(pcResult,"");
-                writeToUiAppend(pcResult, "DES auth the master application with PICC master key");
-
-                try {
-                    boolean result = desfire.authenticate(DES_KEY, DES_KEY_NUMBER, KeyType.DES);
-                    writeToUiAppend(pcResult, "DES authenticate the Master Application result: " + result);
-                    skey = desfire.getSkey();
-                    iv = desfire.getIv();
-                    writeToUiAppend(pcResult, printData("skey", skey));
-                    writeToUiAppend(pcResult, printData("iv", iv));
-                } catch (IOException e) {
-                    //throw new RuntimeException(e);
-                    writeToUiAppend(pcResult, "Exception on DES authenticate the Master Application: " + e.getMessage());
-                } catch (NullPointerException e) {
-                    writeToUiAppend(pcResult, "NP Exception on DES authenticate the Master Application: " + e.getMessage());
-                }
-
-            }
-        });
-
-        /*
-        pcAuthMasterApplicationDes.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
                 // auth the master application with a DES key
                 byte[] response = new byte[2];
+                /*
+                boolean result = authenticateApplicationDes(pcResult, DES_KEY_NUMBER, DES_KEY, true, response);
+                writeToUiAppend(pcResult, "authMasterApplication result: " + result + " with response: " + Utils.bytesToHex(response));
+                if (!result) {
+                    writeToUiAppend(pcResult, "the authMasterApplication was not successful, aborted");
+                    return;
+                }
 
+                 */
 
                 writeToUiAppend(pcResult,"");
                 // this is the raw version
@@ -262,7 +238,11 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                     writeToUiAppend(pcResult, printData("challengeAnswer", challengeAnswer));
 
                     IV = Arrays.copyOfRange(challengeAnswer, 8, 16);
-
+                /*
+                    Build and send APDU with the answer. Basically wrap the challenge answer in the APDU.
+                    The total size of apdu (for this scenario) is 22 bytes:
+                    > 0x90 0xAF 0x00 0x00 0x10 [16 bytes challenge answer] 0x00
+                */
                     byte[] challengeAnswerAPDU = new byte[22];
                     challengeAnswerAPDU[0] = (byte) 0x90; // CLS
                     challengeAnswerAPDU[1] = (byte) 0xAF; // INS
@@ -273,12 +253,21 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                     System.arraycopy(challengeAnswer, 0, challengeAnswerAPDU, 5, challengeAnswer.length);
                     writeToUiAppend(pcResult, printData("challengeAnswerAPDU", challengeAnswerAPDU));
 
-
+                    /*
+                     * Sending the APDU containing the challenge answer.
+                     * It is expected to be return 10 bytes [rndA from the Card] + 9100
+                     */
                     byte[] challengeAnswerResponse = isoDep.transceive(challengeAnswerAPDU);
                     // response = channel.transmit(new CommandAPDU(challengeAnswerAPDU));
                     writeToUiAppend(pcResult, printData("challengeAnswerResponse", challengeAnswerResponse));
                     byte[] challengeAnswerResp = Arrays.copyOf(challengeAnswerResponse, getChallengeResponse.length - 2);
                     writeToUiAppend(pcResult, printData("challengeAnswerResp", challengeAnswerResp));
+
+                    /*
+                     * At this point, the challenge was processed by the card. The card decrypted the
+                     * rndA rotated it and sent it back.
+                     * Now we need to check if the RndA sent by the Card is valid.
+                     */// encrypted rndA from Card, returned in the last step byte[] encryptedRndAFromCard = response.getData();
 
                     // Decrypt the rnd received from the Card.byte[] rotatedRndAFromCard = decrypt(encryptedRndAFromCard, defaultDESKey, IV);
                     //byte[] rotatedRndAFromCard = decrypt(encryptedRndAFromCard, defaultDESKey, IV);
@@ -308,15 +297,16 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                 }
             }
         });
-        */
 
         pcAuthMasterApplicationAes.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
 
                 writeToUiAppend(pcResult,"");
-                writeToUiAppend(pcResult, "AES auth the master application with PICC master key");
+                writeToUiAppend(pcResult, "auth the master application with PICC master key");
 
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
                 try {
                     boolean result = desfire.authenticate(AES_KEY, AID_Master_AES_KEY_NUMBER, KeyType.AES);
                     writeToUiAppend(pcResult, "authenticate the Master Application result: " + result);
@@ -368,14 +358,16 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                 writeToUiAppend(pcResult, printData("response", response));
 */
 
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
                 try {
                     writeToUiAppend(pcResult,"");
                     writeToUiAppend(pcResult,"authenticate with VC Configuration key");
                     writeToUiAppend(pcResult, printData("pre skey", desfire.getSkey()));
                     writeToUiAppend(pcResult, printData("pre iv", desfire.getIv()));
                     writeToUiAppend(pcResult,"set the skey and empty IV");
-                    //desfire.setSkey(skey);
-                    //desfire.setIv(new byte[16]);
+                    desfire.setSkey(skey);
+                    desfire.setIv(new byte[16]);
                     boolean result = desfire.authenticate(VC_CONFIG_KEY, VC_CONFIG_KEY_NUMBER, KeyType.AES);
                     writeToUiAppend(pcResult, "Auth VC CONFIGURATION KEY result: " + result);
                     writeToUiAppend(pcResult, printData("skey", desfire.getSkey()));
@@ -395,6 +387,8 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
             public void onClick(View view) {
                 // run an AES authorization with the VcConfigKey
 
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
                 try {
                     boolean result = desfire.authenticate(VC_PROXIMITY_KEY, VC_PROXIMITY_KEY_NUMBER, KeyType.AES);
                     writeToUiAppend(pcResult,"");
@@ -421,11 +415,12 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                 // this will set a new key
                 writeToUiAppend(pcResult,"");
                 writeToUiAppend(pcResult, "write the VC configuration key (0x20) DES");
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
 
-                //byte[] oldKey = new byte[16];
+                byte[] oldKey = new byte[16];
 
                 try {
-                    /*
                     boolean dfSelectM = desfire.selectApplication(AID_Master);
                     writeToUiAppend(pcResult, "dfSelectMasterApplication result: " + dfSelectM);
 
@@ -433,18 +428,13 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                     writeToUiAppend(pcResult, "dfAuthenticateMasterApplication result: " + dfAuthM);
                     skey = desfire.getSkey();
                     writeToUiAppend(pcResult, printData("sessionkey", skey));
-                     */
 
-                    //desfire.setKtype(KeyType.AES);
-                    writeToUiAppend(pcResult, printData("pre skey", desfire.getSkey()));
-                    writeToUiAppend(pcResult, printData("pre IV", desfire.getIv()));
-                    boolean result = desfire.changeKey(VC_CONFIG_KEY_NUMBER, (byte) 0, KeyType.AES, VC_CONFIG_KEY, OLD_DES_KEY);
-                    writeToUiAppend(pcResult, "set VC configuration Key: " + result);
-                    writeToUiAppend(pcResult, printData("after skey", desfire.getSkey()));
-                    writeToUiAppend(pcResult, printData("after IV", desfire.getIv()));
+                    desfire.setKtype(KeyType.AES);
+                    boolean result = desfire.changeKeyWithoutValidation(VC_CONFIG_KEY_NUMBER, (byte) 0, KeyType.AES, VC_CONFIG_KEY, oldKey, skey);
+                    writeToUiAppend(pcResult, "setKey: " + result);
                 } catch (IOException e) {
                     //throw new RuntimeException(e);
-                    writeToUiAppend(pcResult, "Exception on set VC configuration Key: " + e.getMessage());
+                    writeToUiAppend(pcResult, "Exception on setKey: " + e.getMessage());
                 }
 
 
@@ -457,6 +447,8 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                 // this will set a new key
                 writeToUiAppend(pcResult,"");
                 writeToUiAppend(pcResult, "write the VC configuration key (0x20) AES");
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
 
                 byte[] oldKey = new byte[16];
 
@@ -470,16 +462,11 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                     byte[] sessionKey = desfire.getSkey();
                     writeToUiAppend(pcResult, printData("sessionkey", sessionKey));
 */
-                    //desfire.setSkey(skey);
-                    //desfire.setIv(new byte[16]);
-                    //desfire.setKtype(KeyType.AES);
+                    desfire.setSkey(skey);
+                    desfire.setIv(new byte[16]);
+                    desfire.setKtype(KeyType.AES);
+                    boolean result = desfire.changeKeyWithoutValidation(VC_CONFIG_KEY_NUMBER, (byte) 0, KeyType.AES, VC_CONFIG_KEY, oldKey, skey);
 
-                    writeToUiAppend(pcResult, printData("pre skey", desfire.getSkey()));
-                    writeToUiAppend(pcResult, printData("pre IV", desfire.getIv()));
-                    //boolean result = desfire.changeKeyWithoutValidation(VC_CONFIG_KEY_NUMBER, (byte) 0, KeyType.AES, VC_CONFIG_KEY, oldKey, skey);
-                    boolean result = desfire.changeKey(VC_CONFIG_KEY_NUMBER, (byte) 0, KeyType.AES, VC_CONFIG_KEY, oldKey);
-                    writeToUiAppend(pcResult, printData("after skey", desfire.getSkey()));
-                    writeToUiAppend(pcResult, printData("after IV", desfire.getIv()));
                     writeToUiAppend(pcResult, "setKey: " + result);
                 } catch (IOException e) {
                     //throw new RuntimeException(e);
@@ -498,6 +485,8 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                 // this will set a new key
                 writeToUiAppend(pcResult,"");
                 writeToUiAppend(pcResult, "write the VC proximity key (0x21)");
+                DESFireEV1 desfire = new DESFireEV1();
+                desfire.setAdapter(desFireAdapter);
 
                 byte[] oldKey = new byte[16];
 
@@ -532,24 +521,7 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
             }
         });
 
-        pcChangeMasterKeyToDes.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // as I irregularly change my cards master key to AES this method will change the key back to DES
-                writeToUiAppend(pcResult,"");
-                writeToUiAppend(pcResult, "change the MasterApplicationKey to DES (0x00)");
-                byte[] oldKey = new byte[16];
 
-                try {
-                    //boolean result = desfire.changeKeyWithoutValidation(VC_CONFIG_KEY_NUMBER, (byte) 0, KeyType.AES, VC_CONFIG_KEY, oldKey, skey);
-                    boolean result = desfire.changeKey(AID_Master_AES_KEY_NUMBER, (byte) 0, KeyType.DES, DES_KEY, AES_KEY);
-                    writeToUiAppend(pcResult, "set MasterApplicationKey to DES: " + result);
-                } catch (IOException e) {
-                    //throw new RuntimeException(e);
-                    writeToUiAppend(pcResult, "Exception on set MasterApplicationKey to DES: " + e.getMessage());
-                }
-            }
-        });
 
 
 /*
@@ -1309,9 +1281,6 @@ public class ProximityCheckActivity extends AppCompatActivity implements NfcAdap
                 //nfcjTag.setIo(defaultIsoDepAdapter);
                 //nfcjTag.setIo(isoDepWrapper1);
                 desfireTag = new DesfireTag();
-                desfire = new DESFireEV1();
-                desfire.setAdapter(desFireAdapter);
-
                 System.out.println("*** tagId: " + Utils.bytesToHex(tag.getId()));
 
                 // tag ID
