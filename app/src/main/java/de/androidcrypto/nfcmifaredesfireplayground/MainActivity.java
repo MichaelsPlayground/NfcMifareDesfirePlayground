@@ -6,6 +6,7 @@ import static com.github.skjolber.desfire.libfreefare.MifareDesfire.mifare_desfi
 import static nfcjlib.core.DESFireEV1.validateKey;
 
 import android.content.Context;
+import android.content.Intent;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
@@ -4159,114 +4160,16 @@ but now I can work on reading the AES encrypted file
         btn38.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                // set the AES keys for proximity check
-                // works on EV2 and EV3 only !
+                Intent intent = new Intent(MainActivity.this, ProximityCheckActivity.class);
+                startActivity(intent);
+            }
+        });
 
-                // see http://www.domcc3.com/assets/pdfs/Celiano_overclocking-proximity-checks.pdf
-                // as we need AES encryption we use the Desfire methods
-
-                // first we setup a des-key secured application
-                byte[] responseData = new byte[2];
-
-                DESFireEV1 desfire = new DESFireEV1();
-                //desfire.setAdapter(defaultIsoDepAdapter);
-                desfire.setAdapter(desFireAdapter);
-                PayloadBuilder pb = new PayloadBuilder();
-                try {
-
-                    byte[] AES_AID = Utils.hexStringToByteArray("414240");
-                    byte applicationMasterKeySettings = (byte) 0x0f; // amks
-                    byte[] desKey = new byte[8]; // for the master application
-                    byte[] aesKey = new byte[16];
-
-                    // complete reading
-                    boolean dfSelectM = desfire.selectApplication(AID_Master);
-                    writeToUiAppend(readResult, "dfSelectM result: " + dfSelectM);
-
-                    boolean dfAuthM = desfire.authenticate(desKey, (byte) 0, KeyType.DES);
-                    writeToUiAppend(readResult, "dfAuthMRead result: " + dfAuthM);
-
-/*
-set the VCConfigurationKey using the DESFire’s ChangeKey command. Next, I performed an AES authentication
-to the DESFire using the VCConfigurationKey and used the ChangeKey command to set the VCProximityKey.
-After VCProximityKey had been explicitly set, the key was enabled and I was able to perform the
-Proximity Check using either the ACR122 or the Proxmark 3.
- */
-
-                    byte[] AES_KEY_VC2X_ZERO = Utils.hexStringToByteArray("00000000000000000000000000000000");
-                    byte[] AES_KEY_VC2X = Utils.hexStringToByteArray("BB000000000000000000000000000000");
-
-                    // get key settings for key 0x20
-                    DesfireApplicationKeySettings keySettings00 = desfire.getKeySettings();
-                    writeToUiAppend(readResult, "keySettings00: " + keySettings00.toString());
-
-                    // change key 20
-                    // boolean changeKey(byte keyNo, KeyType newType, byte[] newKey, byte[] oldKey)
-                    byte key20 = (byte) 0x20;
-                    boolean changeKey20Result = desfire.changeKey(key20, KeyType.AES, AES_KEY_VC2X, AES_KEY_VC2X_ZERO);
-                    writeToUiAppend(readResult, "changeKey20Result: " + changeKey20Result);
-                    // change key 21
-                    // boolean changeKey(byte keyNo, KeyType newType, byte[] newKey, byte[] oldKey)
-                    byte key21 = (byte) 0x21;
-                    boolean changeKey21Result = desfire.changeKey(key21, KeyType.AES, AES_KEY_VC2X, AES_KEY_VC2X_ZERO);
-                    writeToUiAppend(readResult, "changeKey21Result: " + changeKey21Result);
-
-/*
-                    // Standard file
-                    writeToUiAppend(readResult, "");
-                    writeToUiAppend(readResult, "Create application");
-
-                    boolean dfCreateApplication = desfire.createApplication(AES_AID, applicationMasterKeySettings, KeyType.AES, (byte) 3);
-                    writeToUiAppend(readResult, "dfCreateApplication result: " + dfCreateApplication);
-
-                    boolean dfSelectApplication = desfire.selectApplication(AES_AID);
-                    writeToUiAppend(readResult, "dfSelectApplication result: " + dfSelectApplication);
-
-                    boolean dfAuthApplication = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
-                    writeToUiAppend(readResult, "dfAuthApplication result: " + dfAuthApplication);
-
-                    // Standard file
-                    writeToUiAppend(readResult, "");
-                    writeToUiAppend(readResult, "Standard file");
-
-                    byte[] payloadStandardFile = pb.createStandardFile(desFileNumberStandard, PayloadBuilder.CommunicationSetting.Encrypted,
-                            0, 0, 0, 0, desFileNumberStandardSize);
-                    boolean dfCreateStandardFile = desfire.createStdDataFile(payloadStandardFile);
-                    writeToUiAppend(readResult, "dfCreateStandardFile result: " + dfCreateStandardFile);
-
-
-                    // auth for writing
-                    boolean dfAuthS1 = desfire.authenticate(aesKey, desKeyNumberRW, KeyType.AES);
-                    writeToUiAppend(readResult, "dfAuthS1 result: " + dfAuthS1);
-
-                    String dataStandardString = "*** Standard file data ***";
-                    String dataStandard24String = "abcdefghijklmnopqrstuvwx";
-                    String dataStandard24String2 = "123456789012345678901234";
-                    //String dataStandard32String = "12345678901234567890123456789012";
-                    byte[] payloadWriteStandardData = pb.writeToStandardFile(desFileNumberStandard, dataStandard24String);
-                    boolean dfWriteStandard = desfire.writeData(payloadWriteStandardData);
-                    writeToUiAppend(readResult, "dfWriteStandard result: " + dfWriteStandard);
-
-                    // auth for reading skipped
-
-                    byte[] readStandard = desfire.readData((byte) (desFileNumberStandard & 0xff), (byte) 0x00, (byte) (desFileNumberStandardSize & 0xff));
-                    writeToUiAppend(readResult, printData("readStandard", readStandard));
-                    if (readStandard != null) {
-                        writeToUiAppend(readResult, new String(readStandard, StandardCharsets.UTF_8));
-                    } else {
-                        writeToUiAppend(readResult, "no data available");
-                    }
-*/
-
-                } catch (IOException e) {
-                    writeToUiAppend(readResult, "IOEx Error with DESFireEV1 + " + e.getMessage());
-                } catch (Exception e) {
-                    writeToUiAppend(readResult, "Ex Error with DESFireEV1 + " + e.getMessage());
-                }
-
-
-
-
+        btn39.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(MainActivity.this, NdefActivity.class);
+                startActivity(intent);
             }
         });
     }
@@ -4801,16 +4704,27 @@ Proximity Check using either the ACR122 or the Proxmark 3.
 
         // MIFARE DESFire CreateApplication using the default AID 000001h (see section 6.4.1 for the definition of the allowed AID values),
         // key settings equal to 0Fh, NumOfKeys equal to 01h, File-ID equal to 10E1h, DF-name equal to D2760000850101
-        //Command: 90 CA 00 00 0E 01 00 00 0F 21 10 E1 D2 76 00 00 85 01 01 00h
+        // Command: 90 CA 00 00 0E 01 00 00 0F 21 10 E1 D2 76 00 00 85 01 01 00h
 
+        // todo change this is rough code from MIFARE DESFire as Type 4 Tag AN11004.pdf
+        /*
+
+         */
+        byte[] commandSequence = Utils.hexStringToByteArray("90CA00000E0100000F2110E1D276000085010100");
+
+
+
+/*
         // create an application
         byte createApplicationCommand = (byte) 0xca;
         PayloadBuilder pb = new PayloadBuilder();
         byte[] createApplicationParameters = pb.createApplicationIso(applicationIdentifier, keySettings, numberOfKeys, applicationIdentifierFileId, applicationIdentifierDfName);
         writeToUiAppend(logTextView, printData("createApplicationIsoParameters", createApplicationParameters));
+        */
         byte[] createApplicationResponse = new byte[0];
         try {
-            createApplicationResponse = isoDep.transceive(wrapMessage(createApplicationCommand, createApplicationParameters));
+            createApplicationResponse = isoDep.transceive(commandSequence);
+            //createApplicationResponse = isoDep.transceive(wrapMessage(createApplicationCommand, createApplicationParameters));
             writeToUiAppend(logTextView, printData("createApplicationIsoResponse", createApplicationResponse));
             System.arraycopy(returnStatusBytes(createApplicationResponse), 0, response, 0, 2);
             //System.arraycopy(createApplicationResponse, 0, response, 0, createApplicationResponse.length);
@@ -4865,6 +4779,33 @@ Proximity Check using either the ACR122 or the Proxmark 3.
         byte[] selectApplicationResponse = new byte[0];
         try {
             selectApplicationResponse = isoDep.transceive(wrapMessage(selectApplicationCommand, applicationIdentifier));
+            writeToUiAppend(logTextView, printData("selectApplicationResponse", selectApplicationResponse));
+            System.arraycopy(returnStatusBytes(selectApplicationResponse), 0, response, 0, 2);
+            //System.arraycopy(selectApplicationResponse, 0, response, 0, selectApplicationResponse.length);
+            if (checkResponse(selectApplicationResponse)) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(logTextView, "selectApplicationDes transceive failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean selectApplicationIso(TextView logTextView, byte[] applicationIdentifier, byte[] response) {
+
+        // todo change this is rough programming
+        byte[] commandSequence = Utils.hexStringToByteArray("905A00000301000000");
+
+
+        // select application
+        byte selectApplicationCommand = (byte) 0x5a;
+        byte[] selectApplicationResponse = new byte[0];
+        try {
+            selectApplicationResponse = isoDep.transceive(commandSequence);
+            //selectApplicationResponse = isoDep.transceive(wrapMessage(selectApplicationCommand, applicationIdentifier));
             writeToUiAppend(logTextView, printData("selectApplicationResponse", selectApplicationResponse));
             System.arraycopy(returnStatusBytes(selectApplicationResponse), 0, response, 0, 2);
             //System.arraycopy(selectApplicationResponse, 0, response, 0, selectApplicationResponse.length);
@@ -5004,6 +4945,90 @@ Proximity Check using either the ACR122 or the Proxmark 3.
     /**
      * section for standard files
      */
+
+    private boolean createStandardFileIso(TextView logTextView, byte fileNumber, byte[] response) {
+
+        // this code is taken from MIFARE DESFire as Type 4 Tag AN11004.pdf
+        // this is raw code with fixed data, todo CHANGE
+        /*
+        step 4
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
+        ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh,
+        FileSize bigger equal to 00000Fh
+        Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
+
+        step 6
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 02h (NDEF File DESFire FID),
+        ISO FileID equal to E104h, ComSet equal to 00h, AccessRights equal to EEE0h,
+        FileSize equal to 000800h (2048 Bytes)
+        Command: 90 CD 00 00 09 02 04 E1 00 E0 EE 00 08 00 00h
+         */
+        byte[] commandSequence = Utils.hexStringToByteArray("90CD0000090103E10000E00F000000");
+        byte[] createStandardFileResponse = new byte[0];
+        try {
+            createStandardFileResponse = isoDep.transceive(commandSequence);
+            //createStandardFileResponse = isoDep.transceive(wrapMessage(createStandardFileCommand, createStandardFileParameters));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(readResult, printData("createStandardFileResponse", createStandardFileResponse));
+        System.arraycopy(returnStatusBytes(createStandardFileResponse), 0, response, 0, 2);
+        writeToUiAppend(logTextView, printData("createStandardFileResponse", createStandardFileResponse));
+        if (checkDuplicateError(createStandardFileResponse)) {
+            writeToUiAppend(logTextView, "the file was not created as it already exists, proceed");
+            return true;
+        }
+        if (checkResponse(createStandardFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean createStandardFileIsoStep6(TextView logTextView, byte fileNumber, byte[] response) {
+
+        // this code is taken from MIFARE DESFire as Type 4 Tag AN11004.pdf
+        // this is raw code with fixed data, todo CHANGE
+        /*
+        step 4
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
+        ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh,
+        FileSize bigger equal to 00000Fh
+        Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
+
+        step 6
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 02h (NDEF File DESFire FID),
+        ISO FileID equal to E104h, ComSet equal to 00h, AccessRights equal to EEE0h,
+        FileSize equal to 000800h (2048 Bytes)
+        Command: 90 CD 00 00 09 02 04 E1 00 E0 EE 00 08 00 00h
+         */
+        //byte[] commandSequence =  Utils.hexStringToByteArray("90CD0000090103E10000E00F000000");
+        byte[] commandSequence = Utils.hexStringToByteArray("90CD0000090204E100E0EE00080000");
+        byte[] createStandardFileResponse = new byte[0];
+        try {
+            createStandardFileResponse = isoDep.transceive(commandSequence);
+            //createStandardFileResponse = isoDep.transceive(wrapMessage(createStandardFileCommand, createStandardFileParameters));
+        } catch (Exception e) {
+            //throw new RuntimeException(e);
+            writeToUiAppend(readResult, "transceive failed: " + e.getMessage());
+            return false;
+        }
+        writeToUiAppend(readResult, printData("createStandardFileResponse", createStandardFileResponse));
+        System.arraycopy(returnStatusBytes(createStandardFileResponse), 0, response, 0, 2);
+        writeToUiAppend(logTextView, printData("createStandardFileResponse", createStandardFileResponse));
+        if (checkDuplicateError(createStandardFileResponse)) {
+            writeToUiAppend(logTextView, "the file was not created as it already exists, proceed");
+            return true;
+        }
+        if (checkResponse(createStandardFileResponse)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
 
     private boolean createStandardFile(TextView logTextView, byte fileNumber, byte[] response) {
         // we create a standard file within the selected application

@@ -27,9 +27,7 @@ public class PayloadBuilder {
 
     private int MAXIMUM_FILE_SIZE = 32; // avoid framing
 
-    /**
-     * section for file type 00 = Standard Files
-     */
+
 
     public byte[] createApplicationIso(byte[] aid, byte keySettings, byte numberOfKeys, byte[] isoFileId, byte[] isoDfName) {
         // sanity checks
@@ -52,6 +50,10 @@ public class PayloadBuilder {
         baos.write(isoDfName, 0, isoDfName.length);
         return baos.toByteArray();
     }
+
+    /**
+     * section for file type 00 = Standard Files
+     */
 
     public byte[] createStandardFile(int fileNumber, CommunicationSetting communicationSetting, int keyRW, int keyCar, int keyR, int keyW, int fileSize) {
         // sanity checks
@@ -76,6 +78,49 @@ public class PayloadBuilder {
         payload[2] = accessRightsRwCar;
         payload[3] = accessRightsRW;
         System.arraycopy(fileSizeByte, 0, payload, 4, 3);
+        return payload;
+    }
+
+    /*
+        step 4
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 01h (CC File DESFire FID),
+        ISO FileID equal to E103h, ComSet equal to 00h, AccessRights equal to EEEEh,
+        FileSize bigger equal to 00000Fh
+        Command: 90 CD 00 00 09 01 03 E1 00 00 E0 0F 00 00 00h
+        NOTE: There is an error in the command, the Access Rights do have a wrong value
+
+        step 6
+        MIFARE DESFire CreateStdDataFile with FileNo equal to 02h (NDEF File DESFire FID),
+        ISO FileID equal to E104h, ComSet equal to 00h, AccessRights equal to EEE0h,
+        FileSize equal to 000800h (2048 Bytes)
+        Command: 90 CD 00 00 09 02 04 E1 00 E0 EE 00 08 00 00h
+         */
+    public byte[] createStandardFileIso(int fileNumber, byte[] isoFileId, CommunicationSetting communicationSetting, int keyRW, int keyCar, int keyR, int keyW, int fileSize) {
+        // sanity checks
+        if ((fileNumber < 0) || (fileNumber > 15)) return null;
+        if (isoFileId == null) return null;
+        if ((keyRW < 0) || (keyRW > 15)) return null;
+        if ((keyCar < 0) || (keyCar > 15)) return null;
+        if ((keyR < 0) || (keyR > 15)) return null;
+        if ((keyW < 0) || (keyW > 15)) return null;
+        //if ((fileSize < 0) || (fileSize > MAXIMUM_FILE_SIZE)) return null;
+        if (fileSize < 0) return null;
+
+        // build
+        byte communicationSettings = 0;
+        if (communicationSetting == CommunicationSetting.Plain) communicationSettings = (byte) 0x00;
+        if (communicationSetting == CommunicationSetting.MACed) communicationSettings = (byte) 0x01;
+        if (communicationSetting == CommunicationSetting.Encrypted) communicationSettings = (byte) 0x03;
+        byte accessRightsRwCar = (byte) ((keyRW << 4) | (keyCar & 0x0F)); // Read&Write Access & ChangeAccessRights
+        byte accessRightsRW = (byte) ((keyR << 4) | (keyW & 0x0F)) ;// Read Access & Write Access // read with key 0, write with key 0
+        byte[] fileSizeByte = intTo3ByteArrayLsb(fileSize);
+        byte[] payload = new byte[9];
+        payload[0] = (byte) (fileNumber & 0xff); // fileNumber
+        System.arraycopy(isoFileId, 0, payload, 1, 2);
+        payload[3] = communicationSettings;
+        payload[4] = accessRightsRwCar;
+        payload[5] = accessRightsRW;
+        System.arraycopy(fileSizeByte, 0, payload, 6, 3);
         return payload;
     }
 
@@ -111,6 +156,23 @@ public class PayloadBuilder {
     }
 
     public byte[] writeToStandardFile(int fileNumber, byte[] data) {
+        // sanity checks
+        if ((fileNumber < 0) || (fileNumber > 15)) return null;
+        if (data == null) return null;
+        if (data.length > MAXIMUM_FILE_SIZE) return null; // avoid framing
+
+        // build
+        byte[] offset = new byte[]{(byte) 0x00, (byte) 0xf00, (byte) 0x00}; // write at the beginning, fixed
+        byte[] lengthOfData = intTo3ByteArrayLsb(data.length);
+        byte[] payload = new byte[7 + data.length]; // 7 + length of data
+        payload[0] = (byte) (fileNumber & 0xff); // fileNumber
+        System.arraycopy(offset, 0, payload, 1, 3);
+        System.arraycopy(lengthOfData, 0, payload, 4, 3);
+        System.arraycopy(data, 0, payload, 7, data.length);
+        return payload;
+    }
+
+    public byte[] writeToStandardFileNdef(int fileNumber, byte[] data) {
         // sanity checks
         if ((fileNumber < 0) || (fileNumber > 15)) return null;
         if (data == null) return null;
