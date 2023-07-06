@@ -19,7 +19,6 @@ package de.androidcrypto.nfcmifaredesfireplayground;
  *
  ****************************************************************************/
 
-
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
